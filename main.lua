@@ -195,7 +195,20 @@ local function CreateESP(target, isNPC)
 end
 
 local function RemoveESP(obj)
-    local data = ESP_STORAGE[obj]
+    if not obj then return end
+
+    -- 允許傳入任意部件（例如 Humanoid、BodyPart 等），會自動往上找到對應角色 Model
+    local charKey = obj
+    local data = ESP_STORAGE[charKey]
+
+    if not data and typeof(obj) == "Instance" then
+        local char = getChar(obj)
+        if char then
+            charKey = char
+            data = ESP_STORAGE[charKey]
+        end
+    end
+
     if not data then return end
 
     if data.Connections then
@@ -212,14 +225,14 @@ local function RemoveESP(obj)
         end)
     end
 
-    for _, drawing in pairs(data) do 
-        if typeof(drawing) == "userdata" and drawing.Remove then 
-            drawing.Visible = false 
-            drawing:Remove() 
-        end 
+    for _, drawing in pairs(data) do
+        if typeof(drawing) == "userdata" and drawing.Remove then
+            drawing.Visible = false
+            drawing:Remove()
+        end
     end
 
-    ESP_STORAGE[obj] = nil
+    ESP_STORAGE[charKey] = nil
 end
 
 local function CastPiercingRay(origin, direction, params, depth)
