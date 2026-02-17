@@ -28,14 +28,14 @@ _G.PerkESP = {
 }
 
 -- CONFIGURATION
-local SETTINGS = {
+local DEFAULT_SETTINGS = {
     Enabled = true,
     TeamCheck = false,
     MaxRenderDistance = 800, 
     
     -- Auto-Execute Logic (Save script to autoexec folder for best results)
     AutoExecuteOnTeleport = true,
-    MyScriptURL = "", 
+    MyScriptURL = "", -- 已不再使用，保留只是為了相容舊設定
 
     Triggerbot = {
         Enabled = true,
@@ -69,6 +69,10 @@ local SETTINGS = {
         Text = { Enabled = true, Size = 13, Outline = true, Format = "HP: %d%%" }
     }
 }
+
+-- 讓設定變成全域，在腳本多次執行之間持久化
+local SETTINGS = _G.PerkESP_Settings or DEFAULT_SETTINGS
+_G.PerkESP_Settings = SETTINGS
 
 local TARGET_FOLDER_NAMES = {
     "ShootingRangeEntities",
@@ -153,7 +157,8 @@ local function CreateESP(obj, isNPC)
         IsNPC = isNPC,
         CachedRoot = root,
         CachedHum = hum,
-        CachedChar = character
+        CachedChar = character,
+        Connections = {}
     }
 
     for _, d in pairs(drawings) do
@@ -166,12 +171,34 @@ local function CreateESP(obj, isNPC)
     drawings.Name.Center, drawings.Dist.Center, drawings.HealthText.Center = true, true, true
     drawings.Name.Outline, drawings.Dist.Outline, drawings.HealthText.Outline = true, true, true
 
+    -- 綁定此角色相關的生命週期事件以立即清理 ESP
+    drawings.Connections[#drawings.Connections + 1] = AddConnection(character.AncestryChanged:Connect(function(_, parent)
+        if not parent then
+            -- 角色整個被移除
+            RemoveESP(obj)
+        end
+    end))
+
+    drawings.Connections[#drawings.Connections + 1] = AddConnection(hum.Died:Connect(function()
+        RemoveESP(obj)
+    end))
+
     ESP_STORAGE[obj] = drawings
 end
 
 local function RemoveESP(obj)
     if ESP_STORAGE[obj] then
-        for _, drawing in pairs(ESP_STORAGE[obj]) do 
+        local data = ESP_STORAGE[obj]
+        -- 先斷開此物件綁定的連線
+        if data.Connections then
+            for _, conn in ipairs(data.Connections) do
+                if conn and conn.Disconnect then
+                    conn:Disconnect()
+                end
+            end
+        end
+        -- 再移除所有 Drawing
+        for _, drawing in pairs(data) do 
             if typeof(drawing) == "userdata" and drawing.Remove then 
                 drawing.Visible = false 
                 drawing:Remove() 
@@ -197,67 +224,75 @@ local function CastPiercingRay(origin, direction, params, depth)
     return result
 end
 
--- NEW: Helper to check a single item
+-- 判斷並處理單一物件是否為可掛 ESP 的 NPC Model
 local function CheckItem(item)
-    if item:IsA("Model") then
-        local hum = item:FindFirstChildOfClass("Humanoid")
-        if hum then
-            if not Players:GetPlayerFromCharacter(item) and not ESP_STORAGE[item] then
-                 if getRoot(item) and hum.Health > 0 then
-                     CreateESP(item, true)
-                 end
-            end
-        end
+    if not item:IsA("Model") then return end
+    if ESP_STORAGE[item] then return end
+
+    local hum = item:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return end
+
+    -- 排除玩家角色，只處理 NPC
+    if Players:GetPlayerFromCharacter(item) then return end
+
+    if getRoot(item) then
+        CreateESP(item, true)
     end
 end
 
--- NEW: Recursive Scan that attaches listeners
-local function RecursiveScan(parent, depth)
-    depth = depth or 0
-    if depth > 50 then return end 
+-- 針對每個目標資料夾做事件式監聽（Infinite Yield 風格）
+local function SetupNPCFolder(folder)
+    if not folder or CONNECTED_FOLDERS[folder] then return end
+    CONNECTED_FOLDERS[folder] = true
 
-    local items = parent:GetChildren()
-    for i, item in ipairs(items) do
-        if i % 200 == 0 then task.wait() end 
-
-        if item:IsA("Model") then
-            CheckItem(item)
-        elseif item:IsA("Folder") then
-            -- Connect listener to folder if not already connected
-            if not CONNECTED_FOLDERS[item] then
-                CONNECTED_FOLDERS[item] = true
-                AddConnection(item.ChildAdded:Connect(function(child)
-                    -- Wait for child to load properties
-                    task.delay(0.1, function() CheckItem(child) end)
-                end))
-            end
-            RecursiveScan(item, depth + 1)
-        end
+    -- 一次性掃描現有後代（不使用 while 迴圈）
+    for _, desc in ipairs(folder:GetDescendants()) do
+        CheckItem(desc)
     end
+
+    -- 新後代出現時，即時檢查是否為 NPC Model
+    AddConnection(folder.DescendantAdded:Connect(function(child)
+        task.delay(0.05, function()
+            if child and child:IsDescendantOf(folder) then
+                CheckItem(child)
+            end
+        end)
+    end))
+
+    -- 任一後代被移除或整個 Model 被刪除時，立即清理對應 ESP
+    AddConnection(folder.DescendantRemoving:Connect(function(child)
+        if not child then return end
+
+        -- 直接是 NPC Model
+        if ESP_STORAGE[child] then
+            RemoveESP(child)
+            return
+        end
+
+        -- 可能是 Model 內的零件，反推擁有 Humanoid 的 Model
+        local char = getChar(child)
+        if char and ESP_STORAGE[char] then
+            RemoveESP(char)
+        end
+    end))
 end
 
-local function ScanForNPCs()
-    local foldersToScan = {} 
-    
-    for _, name in pairs(TARGET_FOLDER_NAMES) do
+-- 初始化所有目標資料夾與未來新生成的資料夾
+local function InitNPCFolderEvents()
+    -- 先處理目前 workspace 下已存在的目標資料夾
+    for _, name in ipairs(TARGET_FOLDER_NAMES) do
         local folder = workspace:FindFirstChild(name)
-        if folder then table.insert(foldersToScan, folder) end
+        if folder then
+            SetupNPCFolder(folder)
+        end
     end
 
-    task.spawn(function()
-        for _, folder in ipairs(foldersToScan) do
-            -- Connect listener to main folder
-            if not CONNECTED_FOLDERS[folder] then
-                CONNECTED_FOLDERS[folder] = true
-                AddConnection(folder.ChildAdded:Connect(function(child)
-                     task.delay(0.1, function() CheckItem(child) end)
-                end))
-            end
-            pcall(function()
-                RecursiveScan(folder)
-            end)
+    -- 監聽之後才出現的目標資料夾（例如新區域載入）
+    AddConnection(workspace.ChildAdded:Connect(function(child)
+        if child and child:IsA("Folder") and table.find(TARGET_FOLDER_NAMES, child.Name) then
+            SetupNPCFolder(child)
         end
-    end)
+    end))
 end
 
 -- Setup Players
@@ -274,33 +309,27 @@ for _, p in ipairs(Players:GetPlayers()) do SetupPlayer(p) end
 AddConnection(Players.PlayerAdded:Connect(SetupPlayer))
 AddConnection(Players.PlayerRemoving:Connect(function(p) RemoveESP(p) end))
 
--- BACKGROUND LOGIC: Auto-Repair + Scanner
-local lastScanTime = 0
+-- 啟用基於事件的 NPC 監聽（Infinite Yield 風格）
+InitNPCFolderEvents()
+
+-- BACKGROUND LOGIC: Auto-Repair（只做保險檢查，不再用掃描迴圈）
 AddConnection(RunService.Heartbeat:Connect(function()
-    -- Scan every 3 seconds for folders, but Events handle instant spawns
-    if tick() - lastScanTime > 3 then
-        lastScanTime = tick()
-        ScanForNPCs()
+    for obj, data in pairs(ESP_STORAGE) do
+        local isValid = true
         
-        -- Auto-Repair Audit
-        for obj, data in pairs(ESP_STORAGE) do
-            local isValid = true
-            
-            -- If parent is nil, it streamed out. Remove immediately.
-            if not obj or not obj.Parent then
+        if not obj or not obj.Parent then
+            isValid = false
+        else
+            local char = data.CachedChar
+            local root = data.CachedRoot
+            local hum = data.CachedHum
+            if not char or not char.Parent or not root or not root.Parent or not hum or hum.Health <= 0 then
                 isValid = false
-            else
-                 local char = data.CachedChar
-                 local root = data.CachedRoot
-                 local hum = data.CachedHum
-                 if not char or not char.Parent or not root or not root.Parent or not hum or hum.Health <= 0 then
-                    isValid = false
-                 end
             end
-            
-            if not isValid then
-                RemoveESP(obj) 
-            end
+        end
+        
+        if not isValid then
+            RemoveESP(obj) 
         end
     end
 end))
@@ -425,15 +454,13 @@ AddConnection(RunService.RenderStepped:Connect(function()
     end
 end))
 
--- TELEPORT HANDLER
+-- TELEPORT HANDLER（固定載入 KomoHub main.lua）
 if SETTINGS.AutoExecuteOnTeleport then
-    local queue_on_teleport = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
-    if queue_on_teleport then
-        AddConnection(LocalPlayer.OnTeleport:Connect(function(State)
-            if State == Enum.TeleportState.Started then
-                if SETTINGS.MyScriptURL ~= "" then
-                    queue_on_teleport('loadstring(game:HttpGet("'..SETTINGS.MyScriptURL..'"))()')
-                end
+    local queue_on_teleport_fn = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+    if queue_on_teleport_fn then
+        AddConnection(LocalPlayer.OnTeleport:Connect(function(state)
+            if state == Enum.TeleportState.Started then
+                queue_on_teleport_fn([[loadstring(game:HttpGet("https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/main.lua"))()]])
             end
         end))
     end
