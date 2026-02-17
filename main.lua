@@ -36,11 +36,6 @@ local DEFAULT_SETTINGS = {
     AutoExecuteOnTeleport = true,
 
     TargetFolders = {
-        "ShootingRangeEntities",
-        "Mobs",
-        "NPCs",
-        "Enemies",
-        "Dummies"
     },
 
     Triggerbot = {
@@ -290,6 +285,22 @@ local function SetupNPCFolder(folder)
     end))
 end
 
+-- 等待本地角色載入完成（避免剛進遊戲就執行）
+local function WaitForLocalCharacter()
+    local char = LocalPlayer.Character
+    if not char or not char.Parent then
+        char = LocalPlayer.CharacterAdded:Wait()
+    end
+
+    if char then
+        pcall(function()
+            char:WaitForChild("HumanoidRootPart", 5)
+        end)
+    end
+
+    return char
+end
+
 -- 初始化所有目標資料夾與未來新生成的資料夾
 local function InitNPCFolderEvents()
     -- 先處理目前 workspace 下已存在的目標資料夾
@@ -322,169 +333,193 @@ local function SetupPlayer(player)
     end))
 end
 
-for _, p in ipairs(Players:GetPlayers()) do SetupPlayer(p) end
-AddConnection(Players.PlayerAdded:Connect(SetupPlayer))
-AddConnection(Players.PlayerRemoving:Connect(function(p) RemoveESP(p) end))
+-- 主初始化：等當前玩家角色載入後再啟動所有邏輯
+local function InitializePerk()
+    local char = WaitForLocalCharacter()
+    if not char then return end
 
--- 啟用基於事件的 NPC 監聽（Infinite Yield 風格）
-InitNPCFolderEvents()
+    -- 玩家 ESP 初始化
+    for _, p in ipairs(Players:GetPlayers()) do
+        SetupPlayer(p)
+    end
+    AddConnection(Players.PlayerAdded:Connect(SetupPlayer))
+    AddConnection(Players.PlayerRemoving:Connect(function(p)
+        RemoveESP(p)
+    end))
 
--- BACKGROUND LOGIC: Auto-Repair（只做保險檢查，不再用掃描迴圈）
-AddConnection(RunService.Heartbeat:Connect(function()
-    for obj, data in pairs(ESP_STORAGE) do
-        local isValid = true
-        
-        if not obj or not obj.Parent then
-            isValid = false
-        else
-            local char = data.CachedChar
-            local root = data.CachedRoot
-            local hum = data.CachedHum
-            if not char or not char.Parent or not root or not root.Parent or not hum or hum.Health <= 0 then
+    -- 啟用基於事件的 NPC 監聽（Infinite Yield 風格）
+    InitNPCFolderEvents()
+
+    -- BACKGROUND LOGIC: Auto-Repair（只做保險檢查，不再用掃描迴圈）
+    AddConnection(RunService.Heartbeat:Connect(function()
+        if not next(ESP_STORAGE) then
+            return
+        end
+
+        for obj, data in pairs(ESP_STORAGE) do
+            local isValid = true
+            
+            if not obj or not obj.Parent then
                 isValid = false
+            else
+                local c = data.CachedChar
+                local r = data.CachedRoot
+                local h = data.CachedHum
+                if not c or not c.Parent or not r or not r.Parent or not h or h.Health <= 0 then
+                    isValid = false
+                end
+            end
+            
+            if not isValid then
+                RemoveESP(obj) 
             end
         end
-        
-        if not isValid then
-            RemoveESP(obj) 
+    end))
+
+    -- RENDER LOGIC
+    AddConnection(RunService.RenderStepped:Connect(function()
+        -- 若 Triggerbot 關閉且沒有任何 ESP 物件，直接略過本幀
+        if not SETTINGS.Triggerbot.Enabled and not SETTINGS.Enabled then
+            return
         end
-    end
-end))
 
--- RENDER LOGIC
-AddConnection(RunService.RenderStepped:Connect(function()
-    if not SETTINGS.Enabled then return end
-    
-    local camPos = Camera.CFrame.Position
-    local fovFactor = math.tan(math.rad(Camera.FieldOfView / 2)) * 2
+        local hasESP = next(ESP_STORAGE) ~= nil
+        local camPos = Camera.CFrame.Position
+        local fovFactor = math.tan(math.rad(Camera.FieldOfView / 2)) * 2
 
-    -- TRIGGERBOT
-    if SETTINGS.Triggerbot.Enabled and UIS:IsMouseButtonPressed(SETTINGS.Triggerbot.ActiveKey) then
-        local mousePos = UIS:GetMouseLocation()
-        local ray = Camera:ViewportPointToRay(mousePos.X, mousePos.Y)
-        local params = RaycastParams.new()
-        params.FilterType = Enum.RaycastFilterType.Exclude
-        params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-        
-        local result = CastPiercingRay(ray.Origin, ray.Direction * SETTINGS.Triggerbot.MaxDistance, params)
-        if result and result.Instance then
-            local char = getChar(result.Instance)
-            if char and char ~= LocalPlayer.Character then
-                local dist = (camPos - result.Position).Magnitude
-                if dist <= SETTINGS.MaxRenderDistance then 
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    if hum and hum.Health > 0 then
-                        local targetP = Players:GetPlayerFromCharacter(char)
-                        local canShoot = (targetP and (not SETTINGS.TeamCheck or targetP.Team ~= LocalPlayer.Team)) or (not targetP and SETTINGS.Triggerbot.AttackNPCs)
-                        if canShoot and (tick() - lastShot) > SETTINGS.Triggerbot.ClickDelay then
-                            lastShot = tick()
-                            VIM:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, true, game, 0)
-                            task.spawn(function()
-                                task.wait(0.01)
-                                VIM:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, false, game, 0)
-                            end)
+        -- TRIGGERBOT
+        if SETTINGS.Triggerbot.Enabled and UIS:IsMouseButtonPressed(SETTINGS.Triggerbot.ActiveKey) then
+            local mousePos = UIS:GetMouseLocation()
+            local ray = Camera:ViewportPointToRay(mousePos.X, mousePos.Y)
+            local params = RaycastParams.new()
+            params.FilterType = Enum.RaycastFilterType.Exclude
+            params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+            
+            local result = CastPiercingRay(ray.Origin, ray.Direction * SETTINGS.Triggerbot.MaxDistance, params)
+            if result and result.Instance then
+                local c = getChar(result.Instance)
+                if c and c ~= LocalPlayer.Character then
+                    local dist = (camPos - result.Position).Magnitude
+                    if dist <= SETTINGS.MaxRenderDistance then 
+                        local hum = c:FindFirstChildOfClass("Humanoid")
+                        if hum and hum.Health > 0 then
+                            local targetP = Players:GetPlayerFromCharacter(c)
+                            local canShoot = (targetP and (not SETTINGS.TeamCheck or targetP.Team ~= LocalPlayer.Team)) or (not targetP and SETTINGS.Triggerbot.AttackNPCs)
+                            if canShoot and (tick() - lastShot) > SETTINGS.Triggerbot.ClickDelay then
+                                lastShot = tick()
+                                VIM:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, true, game, 0)
+                                task.spawn(function()
+                                    task.wait(0.01)
+                                    VIM:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, false, game, 0)
+                                end)
+                            end
                         end
                     end
                 end
             end
         end
-    end
 
-    -- ESP RENDER
-    for obj, drawings in pairs(ESP_STORAGE) do
-        local character = drawings.CachedChar
-        local root = drawings.CachedRoot
-        local hum = drawings.CachedHum
-        
-        -- Player Respawn Check
-        if not drawings.IsNPC and obj.Character and obj.Character ~= character then
-            RemoveESP(obj)
-            CreateESP(obj, false)
-        end
-
-        local config = drawings.IsNPC and SETTINGS.NPC_ESP or SETTINGS.PlayerESP
-        local isActuallyVisible = false
-
-        if not character or not character.Parent or not root or not root.Parent or not hum or hum.Health <= 0 then
-            -- Audit loop will remove, just hide for now
-            isActuallyVisible = false
-        else
-            if config.Enabled then
-                local rootPos = root.Position
-                local dist = (camPos - rootPos).Magnitude
+        -- ESP RENDER
+        if SETTINGS.Enabled and hasESP then
+            for obj, drawings in pairs(ESP_STORAGE) do
+                local character = drawings.CachedChar
+                local root = drawings.CachedRoot
+                local hum = drawings.CachedHum
                 
-                if dist <= SETTINGS.MaxRenderDistance then
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(rootPos)
-                    
-                    if onScreen then
-                        isActuallyVisible = true
-                        ManageHighlight(character, true, config.HighlightColor)
-                        
-                        local scale = 1 / (dist * fovFactor) * 1000
-                        local w, h = scale * 6, scale * 8
-                        local x, y = screenPos.X - w/2, screenPos.Y - h/2
+                -- Player Respawn Check
+                if not drawings.IsNPC and obj.Character and obj.Character ~= character then
+                    RemoveESP(obj)
+                    CreateESP(obj, false)
+                end
 
-                        drawings.Box.Visible = SETTINGS.Box.Enabled
-                        drawings.Box.Size = Vector2.new(w, h)
-                        drawings.Box.Position = Vector2.new(x, y)
-                        drawings.Box.Color = config.BoxColor
+                local config = drawings.IsNPC and SETTINGS.NPC_ESP or SETTINGS.PlayerESP
+                local isActuallyVisible = false
 
-                        drawings.Name.Visible = SETTINGS.Name.Enabled
-                        drawings.Name.Text = (drawings.IsNPC and "[NPC] " .. character.Name or obj.Name)
-                        drawings.Name.Position = Vector2.new(screenPos.X, y - 20)
-                        drawings.Name.Color = config.BoxColor
+                if not character or not character.Parent or not root or not root.Parent or not hum or hum.Health <= 0 then
+                    -- Audit loop will remove, just hide for now
+                    isActuallyVisible = false
+                else
+                    if config.Enabled then
+                        local rootPos = root.Position
+                        local dist = (camPos - rootPos).Magnitude
                         
-                        local healthP = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-                        
-                        drawings.HealthBg.Visible = SETTINGS.Health.Box.Enabled
-                        drawings.HealthBg.Size = Vector2.new(w, 5)
-                        drawings.HealthBg.Position = Vector2.new(x, y + h + 5)
-                        
-                        drawings.HealthMain.Visible = SETTINGS.Health.Box.Enabled
-                        drawings.HealthMain.Size = Vector2.new(w * healthP, 5)
-                        drawings.HealthMain.Position = Vector2.new(x, y + h + 5)
-                        drawings.HealthMain.Color = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), healthP)
-                        
-                        drawings.HealthText.Visible = SETTINGS.Health.Text.Enabled
-                        drawings.HealthText.Text = string.format("HP: %d%%", math.floor(healthP * 100))
-                        drawings.HealthText.Position = Vector2.new(screenPos.X, y + h + 15)
-                        drawings.HealthText.Color = Color3.fromRGB(0, 255, 0)
+                        if dist <= SETTINGS.MaxRenderDistance then
+                            local screenPos, onScreen = Camera:WorldToViewportPoint(rootPos)
+                            
+                            if onScreen then
+                                isActuallyVisible = true
+                                ManageHighlight(character, true, config.HighlightColor)
+                                
+                                local scale = 1 / (dist * fovFactor) * 1000
+                                local w, h = scale * 6, scale * 8
+                                local x, y = screenPos.X - w/2, screenPos.Y - h/2
 
-                        drawings.Dist.Visible = SETTINGS.Distance.Enabled
-                        drawings.Dist.Text = math.floor(dist) .. " studs"
-                        drawings.Dist.Position = Vector2.new(screenPos.X, y + h + 25)
-                        drawings.Dist.Color = SETTINGS.Distance.Color
+                                drawings.Box.Visible = SETTINGS.Box.Enabled
+                                drawings.Box.Size = Vector2.new(w, h)
+                                drawings.Box.Position = Vector2.new(x, y)
+                                drawings.Box.Color = config.BoxColor
+
+                                drawings.Name.Visible = SETTINGS.Name.Enabled
+                                drawings.Name.Text = (drawings.IsNPC and "[NPC] " .. character.Name or obj.Name)
+                                drawings.Name.Position = Vector2.new(screenPos.X, y - 20)
+                                drawings.Name.Color = config.BoxColor
+                                
+                                local healthP = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                                
+                                drawings.HealthBg.Visible = SETTINGS.Health.Box.Enabled
+                                drawings.HealthBg.Size = Vector2.new(w, 5)
+                                drawings.HealthBg.Position = Vector2.new(x, y + h + 5)
+                                
+                                drawings.HealthMain.Visible = SETTINGS.Health.Box.Enabled
+                                drawings.HealthMain.Size = Vector2.new(w * healthP, 5)
+                                drawings.HealthMain.Position = Vector2.new(x, y + h + 5)
+                                drawings.HealthMain.Color = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), healthP)
+                                
+                                drawings.HealthText.Visible = SETTINGS.Health.Text.Enabled
+                                drawings.HealthText.Text = string.format("HP: %d%%", math.floor(healthP * 100))
+                                drawings.HealthText.Position = Vector2.new(screenPos.X, y + h + 15)
+                                drawings.HealthText.Color = Color3.fromRGB(0, 255, 0)
+
+                                drawings.Dist.Visible = SETTINGS.Distance.Enabled
+                                drawings.Dist.Text = math.floor(dist) .. " studs"
+                                drawings.Dist.Position = Vector2.new(screenPos.X, y + h + 25)
+                                drawings.Dist.Color = SETTINGS.Distance.Color
+                            end
+                        end
                     end
+                end
+
+                if not isActuallyVisible then
+                    drawings.Box.Visible = false
+                    drawings.Name.Visible = false
+                    drawings.HealthBg.Visible = false
+                    drawings.HealthMain.Visible = false
+                    drawings.HealthText.Visible = false
+                    drawings.Dist.Visible = false
+                    if character then ManageHighlight(character, false) end
                 end
             end
         end
+    end))
 
-        if not isActuallyVisible then
-            drawings.Box.Visible = false
-            drawings.Name.Visible = false
-            drawings.HealthBg.Visible = false
-            drawings.HealthMain.Visible = false
-            drawings.HealthText.Visible = false
-            drawings.Dist.Visible = false
-            if character then ManageHighlight(character, false) end
+    -- TELEPORT HANDLER（固定載入 KomoHub main.lua）
+    if SETTINGS.AutoExecuteOnTeleport then
+        local queue_on_teleport_fn = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+        if queue_on_teleport_fn then
+            -- 先直接 queue 一次，確保下一次 teleport 無論是否觸發 OnTeleport 都會自動執行
+            queue_on_teleport_fn([[loadstring(game:HttpGet("https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/main.lua"))()]])
+
+            -- 再加上事件監聽作為保險，有些執行器在 TeleportState.Started 之後仍會接受 queue 內容
+            AddConnection(LocalPlayer.OnTeleport:Connect(function(state)
+                if state == Enum.TeleportState.Started then
+                    queue_on_teleport_fn([[loadstring(game:HttpGet("https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/main.lua"))()]])
+                end
+            end))
         end
     end
-end))
 
--- TELEPORT HANDLER（固定載入 KomoHub main.lua）
-if SETTINGS.AutoExecuteOnTeleport then
-    local queue_on_teleport_fn = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
-    if queue_on_teleport_fn then
-        -- 先直接 queue 一次，確保下一次 teleport 無論是否觸發 OnTeleport 都會自動執行
-        queue_on_teleport_fn([[loadstring(game:HttpGet("https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/main.lua"))()]])
-
-        -- 再加上事件監聽作為保險，有些執行器在 TeleportState.Started 之後仍會接受 queue 內容
-        AddConnection(LocalPlayer.OnTeleport:Connect(function(state)
-            if state == Enum.TeleportState.Started then
-                queue_on_teleport_fn([[loadstring(game:HttpGet("https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/main.lua"))()]])
-            end
-        end))
-    end
+    StarterGui:SetCore("SendNotification", {Title = "Perk Loaded", Text = "Instant Refresh (Events) Active", Duration = 5})
 end
 
-StarterGui:SetCore("SendNotification", {Title = "Perk Loaded", Text = "Instant Refresh (Events) Active", Duration = 5})
+-- 延遲到本地角色真正載入後再初始化，避免進場黑屏階段就開始工作
+task.spawn(InitializePerk)
