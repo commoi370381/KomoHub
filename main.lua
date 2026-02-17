@@ -36,6 +36,11 @@ local DEFAULT_SETTINGS = {
     AutoExecuteOnTeleport = true,
 
     TargetFolders = {
+        "ShootingRangeEntities",
+        "Mobs",
+        "NPCs",
+        "Enemies",
+        "Dummies"
     },
 
     Triggerbot = {
@@ -521,5 +526,5 @@ local function InitializePerk()
     StarterGui:SetCore("SendNotification", {Title = "Perk Loaded", Text = "Instant Refresh (Events) Active", Duration = 5})
 end
 
--- 延遲到本地角色真正載入後再初始化，避免進場黑屏階段就開始工作
-task.spawn(InitializePerk)
+-- 直接在主執行緒執行初始化，內部會自行等待角色載入
+pcall(InitializePerk)
