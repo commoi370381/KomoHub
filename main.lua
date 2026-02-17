@@ -109,6 +109,16 @@ local function checkPart(partName)
     return false
 end
 
+local function isWhitelisted(char, player)
+    local tb = SETTINGS.Triggerbot
+    if not tb or not tb.WhitelistEnabled then return false end
+    local wl = tb.Whitelist
+    if type(wl) ~= "table" or #wl == 0 then return false end
+    if player and table.find(wl, player.Name) then return true end
+    if char and table.find(wl, char.Name) then return true end
+    return false
+end
+
 local function getRoot(model)
     return model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso") or model.PrimaryPart
 end
@@ -356,6 +366,9 @@ local function InitializePerk()
                         local hum = c:FindFirstChildOfClass("Humanoid")
                         if hum and hum.Health > 0 then
                             local targetP = Players:GetPlayerFromCharacter(c)
+                            if isWhitelisted(c, targetP) then
+                                return
+                            end
                             local canShoot = (targetP and (not SETTINGS.TeamCheck or targetP.Team ~= LocalPlayer.Team)) or (not targetP and SETTINGS.Triggerbot.AttackNPCs)
                             if canShoot and (tick() - lastShot) > SETTINGS.Triggerbot.ClickDelay then
                                 lastShot = tick()
