@@ -252,22 +252,36 @@ local function CastPiercingRay(origin, direction, params, depth)
 end
 
 local function CheckItem(item)
-    if not item:IsA("Model") then return end
-    if ESP_STORAGE[item] then return end
+    if not item or not item.Parent then return end
 
-    local hum = item:FindFirstChildOfClass("Humanoid")
+    -- 嘗試從任意子物件往上找到 NPC Model
+    local char = item
+
+    if not (item:IsA("Model") and item:FindFirstChildOfClass("Humanoid")) then
+        char = getChar(item)
+    end
+
+    if not char or ESP_STORAGE[char] then return end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum or hum.Health <= 0 then return end
 
-    if Players:GetPlayerFromCharacter(item) then return end
+    -- 排除玩家角色，只處理 NPC
+    if Players:GetPlayerFromCharacter(char) then return end
 
-    if getRoot(item) then
-        CreateESP(item, true)
+    if getRoot(char) then
+        CreateESP(char, true)
     end
 end
 
 local function SetupNPCFolder(folder)
     if not folder or CONNECTED_FOLDERS[folder] then return end
     CONNECTED_FOLDERS[folder] = true
+
+    -- 先掃描這個資料夾目前已存在的所有 NPC
+    for _, desc in ipairs(folder:GetDescendants()) do
+        CheckItem(desc)
+    end
 
     AddConnection(folder.DescendantAdded:Connect(function(child)
         task.delay(0.05, function()
