@@ -85,6 +85,15 @@ local LegParts = {"LeftLeg", "RightLeg", "LeftUpperLeg", "RightUpperLeg", "LeftL
 local ESP_STORAGE = {}
 local CONNECTED_FOLDERS = {} -- Prevents double-connecting events
 
+-- 取得目前要監聽的 NPC 目標資料夾清單（自動處理舊設定 / 空表）
+local function GetTargetFolders()
+    local tf = SETTINGS.TargetFolders
+    if type(tf) ~= "table" or #tf == 0 then
+        return DEFAULT_SETTINGS.TargetFolders
+    end
+    return tf
+end
+
 -- Utility Functions
 local function AddConnection(connection)
     table.insert(_G.PerkESP.Connections, connection)
@@ -309,7 +318,7 @@ end
 -- 初始化所有目標資料夾與未來新生成的資料夾
 local function InitNPCFolderEvents()
     -- 先處理目前 workspace 下已存在的目標資料夾
-    local targetFolders = SETTINGS.TargetFolders or DEFAULT_SETTINGS.TargetFolders
+    local targetFolders = GetTargetFolders()
     for _, name in ipairs(targetFolders) do
         local folder = workspace:FindFirstChild(name)
         if folder then
@@ -320,7 +329,7 @@ local function InitNPCFolderEvents()
     -- 監聽之後才出現的目標資料夾（例如新區域載入）
     AddConnection(workspace.ChildAdded:Connect(function(child)
         if child and child:IsA("Folder") then
-            local currentTargets = SETTINGS.TargetFolders or DEFAULT_SETTINGS.TargetFolders
+            local currentTargets = GetTargetFolders()
             if table.find(currentTargets, child.Name) then
                 SetupNPCFolder(child)
             end
