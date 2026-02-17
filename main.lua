@@ -333,7 +333,7 @@ local function AuditESP()
             local character = data.CachedChar
             local hum = data.CachedHum
 
-            if not character or not character.Parent or not hum or hum.Health <= 0 then
+            if not character or not character:IsDescendantOf(workspace) or not hum or hum.Health <= 0 then
                 RemoveESP(char)
             else
                 if data.Player and (not Players:FindFirstChild(data.Player.Name) or data.Player.Character ~= character) then
