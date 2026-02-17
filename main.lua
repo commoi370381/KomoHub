@@ -31,7 +31,7 @@ _G.PerkESP = {
 local DEFAULT_SETTINGS = {
     Enabled = true,
     TeamCheck = false,
-    MaxRenderDistance = 800, 
+    MaxRenderDistance = 800,
     
     AutoExecuteOnTeleport = true,
 
@@ -142,16 +142,14 @@ local function ManageHighlight(character, shouldShow, color)
     end
 end
 
-local function CreateESP(obj, isNPC)
-    if ESP_STORAGE[obj] then return end
-    
-    local character = isNPC and obj or obj.Character
-    if not character then return end
+local function CreateESP(target, isNPC)
+    -- 玩家：target = Player，NPC：target = Model
+    local character = isNPC and target or target.Character
+    if not character or ESP_STORAGE[character] then return end
 
     local root = getRoot(character)
     local hum = character:FindFirstChildOfClass("Humanoid")
-
-    if not root or not hum then return end 
+    if not root or not hum or hum.Health <= 0 then return end
 
     local drawings = {
         Box = TrackDrawing(Drawing.new("Square")),
@@ -164,6 +162,7 @@ local function CreateESP(obj, isNPC)
         CachedRoot = root,
         CachedHum = hum,
         CachedChar = character,
+        Player = isNPC and nil or target,
         Connections = {}
     }
 
@@ -181,53 +180,46 @@ local function CreateESP(obj, isNPC)
     drawings.Connections[#drawings.Connections + 1] = AddConnection(character.AncestryChanged:Connect(function(_, parent)
         if not parent then
             -- 角色整個被移除
-            RemoveESP(obj)
+            RemoveESP(character)
         end
     end))
 
     drawings.Connections[#drawings.Connections + 1] = AddConnection(hum.Died:Connect(function()
-        RemoveESP(obj)
+        RemoveESP(character)
     end))
 
-    ESP_STORAGE[obj] = drawings
-
-    -- 玩家也用 Character 當 key 做一份別名，方便從 Model 端清理
-    if not isNPC then
-        ESP_STORAGE[character] = drawings
-    end
+    ESP_STORAGE[character] = drawings
 end
 
 local function RemoveESP(obj)
-    if ESP_STORAGE[obj] then
-        local data = ESP_STORAGE[obj]
-        -- 先斷開此物件綁定的連線
-        if data.Connections then
-            for _, conn in ipairs(data.Connections) do
-                if conn and conn.Disconnect then
-                    conn:Disconnect()
-                end
-            end
-        end
-        -- 關閉 Highlight（如果角色還存在）
-        if data.CachedChar then
-            pcall(function()
-                ManageHighlight(data.CachedChar, false)
-            end)
-        end
-        -- 再移除所有 Drawing
-        for _, drawing in pairs(data) do 
-            if typeof(drawing) == "userdata" and drawing.Remove then 
-                drawing.Visible = false 
-                drawing:Remove() 
-            end 
-        end
-        -- 移除所有指向同一份 data 的索引（例如 Player 與 Character 的雙 key）
-        for key, value in pairs(ESP_STORAGE) do
-            if value == data then
-                ESP_STORAGE[key] = nil
+    local data = ESP_STORAGE[obj]
+    if not data then return end
+
+    -- 先斷開此物件綁定的連線
+    if data.Connections then
+        for _, conn in ipairs(data.Connections) do
+            if conn and conn.Disconnect then
+                conn:Disconnect()
             end
         end
     end
+
+    -- 關閉 Highlight（如果角色還存在）
+    if data.CachedChar then
+        pcall(function()
+            ManageHighlight(data.CachedChar, false)
+        end)
+    end
+
+    -- 再移除所有 Drawing
+    for _, drawing in pairs(data) do 
+        if typeof(drawing) == "userdata" and drawing.Remove then 
+            drawing.Visible = false 
+            drawing:Remove() 
+        end 
+    end
+
+    ESP_STORAGE[obj] = nil
 end
 
 local function CastPiercingRay(origin, direction, params, depth)
@@ -340,7 +332,9 @@ end
 -- Setup Players
 local function SetupPlayer(player)
     if player == LocalPlayer then return end
-    if player.Character then CreateESP(player, false) end
+    if player.Character then
+        CreateESP(player, false)
+    end
     AddConnection(player.CharacterAdded:Connect(function(char)
         char:WaitForChild("HumanoidRootPart", 5)
         CreateESP(player, false)
@@ -358,7 +352,10 @@ local function InitializePerk()
     end
     AddConnection(Players.PlayerAdded:Connect(SetupPlayer))
     AddConnection(Players.PlayerRemoving:Connect(function(p)
-        RemoveESP(p)
+        -- 只要玩家物件或其角色存在，就一併清理
+        if p.Character then
+            RemoveESP(p.Character)
+        end
     end))
 
     -- 啟用基於事件的 NPC 監聽（Infinite Yield 風格）
@@ -370,22 +367,24 @@ local function InitializePerk()
             return
         end
 
-        for obj, data in pairs(ESP_STORAGE) do
+        for char, data in pairs(ESP_STORAGE) do
             local isValid = true
-            
-            if not obj or not obj.Parent then
+
+            local c = data.CachedChar
+            local r = data.CachedRoot
+            local h = data.CachedHum
+
+            if not c or not c.Parent or not r or not r.Parent or not h or h.Health <= 0 then
                 isValid = false
-            else
-                local c = data.CachedChar
-                local r = data.CachedRoot
-                local h = data.CachedHum
-                if not c or not c.Parent or not r or not r.Parent or not h or h.Health <= 0 then
-                    isValid = false
-                end
+            end
+
+            if isValid and data.Player and (not Players:FindFirstChild(data.Player.Name)) then
+                -- 玩家物件已不在 Players 底下，視為離開
+                isValid = false
             end
             
             if not isValid then
-                RemoveESP(obj) 
+                RemoveESP(char)
             end
         end
     end))
@@ -435,22 +434,23 @@ local function InitializePerk()
 
         -- ESP RENDER
         if SETTINGS.Enabled and hasESP then
-            for obj, drawings in pairs(ESP_STORAGE) do
+            for char, drawings in pairs(ESP_STORAGE) do
                 local character = drawings.CachedChar
                 local root = drawings.CachedRoot
                 local hum = drawings.CachedHum
                 
-                -- Player Respawn Check
-                if not drawings.IsNPC and obj.Character and obj.Character ~= character then
-                    RemoveESP(obj)
-                    CreateESP(obj, false)
+                -- Player Respawn Check：玩家的 Character 被換掉時重建 ESP
+                if not drawings.IsNPC and drawings.Player and drawings.Player.Character and drawings.Player.Character ~= character then
+                    RemoveESP(char)
+                    CreateESP(drawings.Player, false)
+                    goto continue
                 end
 
                 local config = drawings.IsNPC and SETTINGS.NPC_ESP or SETTINGS.PlayerESP
                 local isActuallyVisible = false
 
                 if not character or not character.Parent or not root or not root.Parent or not hum or hum.Health <= 0 then
-                    -- Audit loop will remove, just hide for now
+                    -- Audit loop 會清理，這裡先全部隱藏
                     isActuallyVisible = false
                 else
                     if config.Enabled then
@@ -474,7 +474,13 @@ local function InitializePerk()
                                 drawings.Box.Color = config.BoxColor
 
                                 drawings.Name.Visible = SETTINGS.Name.Enabled
-                                drawings.Name.Text = (drawings.IsNPC and "[NPC] " .. character.Name or obj.Name)
+                                if drawings.IsNPC then
+                                    drawings.Name.Text = "[NPC] " .. character.Name
+                                elseif drawings.Player then
+                                    drawings.Name.Text = drawings.Player.Name
+                                else
+                                    drawings.Name.Text = character.Name
+                                end
                                 drawings.Name.Position = Vector2.new(screenPos.X, y - 20)
                                 drawings.Name.Color = config.BoxColor
                                 
@@ -512,6 +518,8 @@ local function InitializePerk()
                     drawings.Dist.Visible = false
                     if character then ManageHighlight(character, false) end
                 end
+
+                ::continue::
             end
         end
     end))
