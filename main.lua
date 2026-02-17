@@ -385,6 +385,9 @@ local function InitializePerk()
         end
 
         if SETTINGS.Enabled and hasESP then
+            local toRemove = {}
+            local toRespawn = {}
+
             for char, drawings in pairs(ESP_STORAGE) do
                 local character = drawings.CachedChar
                 local root = drawings.CachedRoot
@@ -393,57 +396,77 @@ local function InitializePerk()
                 local config = drawings.IsNPC and SETTINGS.NPC_ESP or SETTINGS.PlayerESP
                 local isActuallyVisible = false
 
-                if character and character.Parent and root and root.Parent and hum and hum.Health > 0 and config.Enabled then
-                    local rootPos = root.Position
-                    local dist = (camPos - rootPos).Magnitude
-                    
-                    if dist <= SETTINGS.MaxRenderDistance then
-                        local screenPos, onScreen = Camera:WorldToViewportPoint(rootPos)
-                        
-                        if onScreen then
-                            isActuallyVisible = true
-                            ManageHighlight(character, true, config.HighlightColor)
+                if not character or not character.Parent then
+                    table.insert(toRemove, char)
+                else
+                    if not drawings.IsNPC and drawings.Player and drawings.Player.Character and drawings.Player.Character ~= character then
+                        table.insert(toRespawn, drawings.Player)
+                        table.insert(toRemove, char)
+                    else
+                        if not root or not root.Parent then
+                            root = getRoot(character)
+                            drawings.CachedRoot = root
+                        end
+                        if not hum or not hum.Parent then
+                            hum = character:FindFirstChildOfClass("Humanoid")
+                            drawings.CachedHum = hum
+                        end
+
+                        if root and root.Parent and hum and hum.Health > 0 and config.Enabled then
+                            local rootPos = root.Position
+                            local dist = (camPos - rootPos).Magnitude
                             
-                            local scale = 1 / (dist * fovFactor) * 1000
-                            local w, h = scale * 6, scale * 8
-                            local x, y = screenPos.X - w/2, screenPos.Y - h/2
+                            if dist <= SETTINGS.MaxRenderDistance then
+                                local screenPos, onScreen = Camera:WorldToViewportPoint(rootPos)
+                                
+                                if onScreen then
+                                    isActuallyVisible = true
+                                    ManageHighlight(character, true, config.HighlightColor)
+                                    
+                                    local scale = 1 / (dist * fovFactor) * 1000
+                                    local w, h = scale * 6, scale * 8
+                                    local x, y = screenPos.X - w/2, screenPos.Y - h/2
 
-                            drawings.Box.Visible = SETTINGS.Box.Enabled
-                            drawings.Box.Size = Vector2.new(w, h)
-                            drawings.Box.Position = Vector2.new(x, y)
-                            drawings.Box.Color = config.BoxColor
+                                    drawings.Box.Visible = SETTINGS.Box.Enabled
+                                    drawings.Box.Size = Vector2.new(w, h)
+                                    drawings.Box.Position = Vector2.new(x, y)
+                                    drawings.Box.Color = config.BoxColor
 
-                            drawings.Name.Visible = SETTINGS.Name.Enabled
-                            if drawings.IsNPC then
-                                drawings.Name.Text = "[NPC] " .. character.Name
-                            elseif drawings.Player then
-                                drawings.Name.Text = drawings.Player.Name
-                            else
-                                drawings.Name.Text = character.Name
+                                    drawings.Name.Visible = SETTINGS.Name.Enabled
+                                    if drawings.IsNPC then
+                                        drawings.Name.Text = "[NPC] " .. character.Name
+                                    elseif drawings.Player then
+                                        drawings.Name.Text = drawings.Player.Name
+                                    else
+                                        drawings.Name.Text = character.Name
+                                    end
+                                    drawings.Name.Position = Vector2.new(screenPos.X, y - 20)
+                                    drawings.Name.Color = config.BoxColor
+                                    
+                                    local healthP = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                                    
+                                    drawings.HealthBg.Visible = SETTINGS.Health.Box.Enabled
+                                    drawings.HealthBg.Size = Vector2.new(w, 5)
+                                    drawings.HealthBg.Position = Vector2.new(x, y + h + 5)
+                                    
+                                    drawings.HealthMain.Visible = SETTINGS.Health.Box.Enabled
+                                    drawings.HealthMain.Size = Vector2.new(w * healthP, 5)
+                                    drawings.HealthMain.Position = Vector2.new(x, y + h + 5)
+                                    drawings.HealthMain.Color = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), healthP)
+                                    
+                                    drawings.HealthText.Visible = SETTINGS.Health.Text.Enabled
+                                    drawings.HealthText.Text = string.format("HP: %d%%", math.floor(healthP * 100))
+                                    drawings.HealthText.Position = Vector2.new(screenPos.X, y + h + 15)
+                                    drawings.HealthText.Color = Color3.fromRGB(0, 255, 0)
+
+                                    drawings.Dist.Visible = SETTINGS.Distance.Enabled
+                                    drawings.Dist.Text = math.floor(dist) .. " studs"
+                                    drawings.Dist.Position = Vector2.new(screenPos.X, y + h + 25)
+                                    drawings.Dist.Color = SETTINGS.Distance.Color
+                                end
                             end
-                            drawings.Name.Position = Vector2.new(screenPos.X, y - 20)
-                            drawings.Name.Color = config.BoxColor
-                            
-                            local healthP = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-                            
-                            drawings.HealthBg.Visible = SETTINGS.Health.Box.Enabled
-                            drawings.HealthBg.Size = Vector2.new(w, 5)
-                            drawings.HealthBg.Position = Vector2.new(x, y + h + 5)
-                            
-                            drawings.HealthMain.Visible = SETTINGS.Health.Box.Enabled
-                            drawings.HealthMain.Size = Vector2.new(w * healthP, 5)
-                            drawings.HealthMain.Position = Vector2.new(x, y + h + 5)
-                            drawings.HealthMain.Color = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), healthP)
-                            
-                            drawings.HealthText.Visible = SETTINGS.Health.Text.Enabled
-                            drawings.HealthText.Text = string.format("HP: %d%%", math.floor(healthP * 100))
-                            drawings.HealthText.Position = Vector2.new(screenPos.X, y + h + 15)
-                            drawings.HealthText.Color = Color3.fromRGB(0, 255, 0)
-
-                            drawings.Dist.Visible = SETTINGS.Distance.Enabled
-                            drawings.Dist.Text = math.floor(dist) .. " studs"
-                            drawings.Dist.Position = Vector2.new(screenPos.X, y + h + 25)
-                            drawings.Dist.Color = SETTINGS.Distance.Color
+                        else
+                            table.insert(toRemove, char)
                         end
                     end
                 end
@@ -456,6 +479,20 @@ local function InitializePerk()
                     drawings.HealthText.Visible = false
                     drawings.Dist.Visible = false
                     if character then ManageHighlight(character, false) end
+                end
+            end
+
+            for _, char in ipairs(toRemove) do
+                RemoveESP(char)
+            end
+
+            if #toRespawn > 0 then
+                local seen = {}
+                for _, plr in ipairs(toRespawn) do
+                    if plr and not seen[plr] then
+                        seen[plr] = true
+                        CreateESP(plr, false)
+                    end
                 end
             end
         end
