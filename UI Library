@@ -933,48 +933,6 @@ function Library:Tab(name, icon)
     return GroupFunctions
 end
 
-local Legit = Library:Tab("Legit", 98159911363596)
-local Rage = Library:Tab("Rage", 10455604811)
-local Visuals = Library:Tab("Visuals", 10455603612)
-local Misc = Library:Tab("Misc", 11888734334)
-local Cfg = Library:Tab("Cfg", 12403097620)
-
-local AimGroup = Legit:Group("Aimbot")
-AimGroup:Toggle({Name = "Enabled", Tooltip = "Auto aim", Callback = function(v)
-    print("Aimbot:", v) 
-end})
-AimGroup:Dropdown({Name = "Priority", Options = {"Closest", "Health", "Distance"}, Default = "Closest", Callback = function(v)
-    print(v)
-end})
-
-AimGroup:Slider({Name = "FOV Radius", Min = 0, Max = 360, Default = 100, Unit = "°", Callback = function(v)
-    print(v)
-end})
-
-AimGroup:ColorPicker({Name = "Box Color", Default = Color3.fromRGB(255, 255, 255), Callback = function(c)
-    print("Box Color", c) 
-end})
-
-AimGroup:Textbox({Name = "Clantag", Placeholder = "Tag...", Callback = function(t)
-    print("Tag:", t) 
-end})
-
-AimGroup:Keybind({Name = "Menu Key", Default = Enum.KeyCode.Insert, Callback = function(k)
-    print("Pressed Key")
-end})
-
-AimGroup:Button({Name = "Danger", Variant = "Danger", Callback = function()
-    print("Danger")
-end})
-
-AimGroup:Button({Name = "Primary", Variant = "Primary", Callback = function()
-    print("Primary")
-end})
-
-AimGroup:Button({Name = "Button", Callback = function()
-    print("Button")
-end})
-
 Library.MenuKey = Enum.KeyCode.Insert
 local Visible = true
 
@@ -1004,6 +962,4 @@ MobileToggle.MouseButton1Click:Connect(function()
     MainFrame.Visible = Visible
 end)
 
-Library:Notify("Success notify", "success")
-Library:Notify("Warning notify", "warning")
-Library:Notify("Notify")
+return Library

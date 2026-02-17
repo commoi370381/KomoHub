@@ -41,6 +41,10 @@ local DEFAULT_SETTINGS = {
         "Dummies"
     },
 
+    HeadParts = {"Head"},
+    BodyParts = {"UpperTorso", "LowerTorso", "Torso", "LeftArm", "RightArm", "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperArm", "LeftLowerArm", "LeftHand"},
+    LegParts = {"LeftLeg", "RightLeg", "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg", "LeftFoot", "RightFoot"},
+
     Triggerbot = {
         Enabled = true,
         AttackNPCs = true, 
@@ -77,9 +81,92 @@ local DEFAULT_SETTINGS = {
 local SETTINGS = _G.PerkESP_Settings or DEFAULT_SETTINGS
 _G.PerkESP_Settings = SETTINGS
 
+-- Load UI Library (loadstring from GitHub)
+local UI_LIB_URL = "https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/UI%20Library"
+local Library = nil
+local success, err = pcall(function()
+    Library = loadstring(game:HttpGet(UI_LIB_URL))()
+end)
+if success and Library then
+    Library.MenuKey = Enum.KeyCode.Insert
+    local MainTab = Library:Tab("Perk ESP", 10455603612)
+
+    local GeneralGroup = MainTab:Group("General")
+    local espTog = GeneralGroup:Toggle({Name = "ESP Enabled", Tooltip = "Master toggle for ESP", Callback = function(v) SETTINGS.Enabled = v end})
+    espTog.Set(SETTINGS.Enabled)
+    local teamTog = GeneralGroup:Toggle({Name = "Team Check", Tooltip = "Don't show teammates", Callback = function(v) SETTINGS.TeamCheck = v end})
+    teamTog.Set(SETTINGS.TeamCheck)
+    GeneralGroup:Slider({Name = "Max Render Distance", Min = 100, Max = 2000, Default = SETTINGS.MaxRenderDistance, Unit = " studs", Callback = function(v) SETTINGS.MaxRenderDistance = v end})
+    local teleTog = GeneralGroup:Toggle({Name = "Auto Execute On Teleport", Tooltip = "Re-run script after teleport", Callback = function(v) SETTINGS.AutoExecuteOnTeleport = v end})
+    teleTog.Set(SETTINGS.AutoExecuteOnTeleport)
+
+    local TriggerGroup = MainTab:Group("Triggerbot")
+    local trigTog = TriggerGroup:Toggle({Name = "Triggerbot Enabled", Callback = function(v) SETTINGS.Triggerbot.Enabled = v end})
+    trigTog.Set(SETTINGS.Triggerbot.Enabled)
+    local atkTog = TriggerGroup:Toggle({Name = "Attack NPCs", Callback = function(v) SETTINGS.Triggerbot.AttackNPCs = v end})
+    atkTog.Set(SETTINGS.Triggerbot.AttackNPCs)
+    local legsTog = TriggerGroup:Toggle({Name = "Shoot Legs", Callback = function(v) SETTINGS.Triggerbot.ShootLegs = v end})
+    legsTog.Set(SETTINGS.Triggerbot.ShootLegs)
+    TriggerGroup:Slider({Name = "Click Delay", Min = 0, Max = 500, Default = math.floor(SETTINGS.Triggerbot.ClickDelay * 1000), Unit = " ms", Callback = function(v) SETTINGS.Triggerbot.ClickDelay = v / 1000 end})
+    local wlTog = TriggerGroup:Toggle({Name = "Whitelist Enabled", Callback = function(v) SETTINGS.Triggerbot.WhitelistEnabled = v end})
+    wlTog.Set(SETTINGS.Triggerbot.WhitelistEnabled)
+    TriggerGroup:Slider({Name = "Max Distance", Min = 100, Max = 1500, Default = SETTINGS.Triggerbot.MaxDistance, Unit = " studs", Callback = function(v) SETTINGS.Triggerbot.MaxDistance = v end})
+    TriggerGroup:Dropdown({Name = "Triggerbot Key", Options = {"Right Mouse", "Left Mouse"}, Default = SETTINGS.Triggerbot.ActiveKey == Enum.UserInputType.MouseButton2 and "Right Mouse" or "Left Mouse", Callback = function(opt)
+        SETTINGS.Triggerbot.ActiveKey = (opt == "Right Mouse") and Enum.UserInputType.MouseButton2 or Enum.UserInputType.MouseButton1
+    end})
+
+    local PlayerESPGroup = MainTab:Group("Player ESP")
+    local pEspTog = PlayerESPGroup:Toggle({Name = "Player ESP", Callback = function(v) SETTINGS.PlayerESP.Enabled = v end})
+    pEspTog.Set(SETTINGS.PlayerESP.Enabled)
+    PlayerESPGroup:ColorPicker({Name = "Player Box Color", Default = SETTINGS.PlayerESP.BoxColor, Callback = function(c) SETTINGS.PlayerESP.BoxColor = c end})
+    PlayerESPGroup:ColorPicker({Name = "Player Highlight", Default = SETTINGS.PlayerESP.HighlightColor, Callback = function(c) SETTINGS.PlayerESP.HighlightColor = c end})
+
+    local NPCESPGroup = MainTab:Group("NPC ESP")
+    local npcEspTog = NPCESPGroup:Toggle({Name = "NPC ESP", Callback = function(v) SETTINGS.NPC_ESP.Enabled = v end})
+    npcEspTog.Set(SETTINGS.NPC_ESP.Enabled)
+    NPCESPGroup:ColorPicker({Name = "NPC Box Color", Default = SETTINGS.NPC_ESP.BoxColor, Callback = function(c) SETTINGS.NPC_ESP.BoxColor = c end})
+    NPCESPGroup:ColorPicker({Name = "NPC Highlight", Default = SETTINGS.NPC_ESP.HighlightColor, Callback = function(c) SETTINGS.NPC_ESP.HighlightColor = c end})
+
+    local VisualsGroup = MainTab:Group("Visuals")
+    local hTog = VisualsGroup:Toggle({Name = "Highlight", Callback = function(v) SETTINGS.Highlight.Enabled = v end})
+    hTog.Set(SETTINGS.Highlight.Enabled)
+    local boxTog = VisualsGroup:Toggle({Name = "Box", Callback = function(v) SETTINGS.Box.Enabled = v end})
+    boxTog.Set(SETTINGS.Box.Enabled)
+    local nameTog = VisualsGroup:Toggle({Name = "Name", Callback = function(v) SETTINGS.Name.Enabled = v end})
+    nameTog.Set(SETTINGS.Name.Enabled)
+    local distTog = VisualsGroup:Toggle({Name = "Distance", Callback = function(v) SETTINGS.Distance.Enabled = v end})
+    distTog.Set(SETTINGS.Distance.Enabled)
+    local hpBoxTog = VisualsGroup:Toggle({Name = "Health Bar", Callback = function(v) SETTINGS.Health.Box.Enabled = v end})
+    hpBoxTog.Set(SETTINGS.Health.Box.Enabled)
+    local hpTextTog = VisualsGroup:Toggle({Name = "Health Text", Callback = function(v) SETTINGS.Health.Text.Enabled = v end})
+    hpTextTog.Set(SETTINGS.Health.Text.Enabled)
+    VisualsGroup:Slider({Name = "Name Size", Min = 10, Max = 24, Default = SETTINGS.Name.Size, Callback = function(v) SETTINGS.Name.Size = v end})
+    VisualsGroup:Slider({Name = "Distance Size", Min = 10, Max = 20, Default = SETTINGS.Distance.Size, Callback = function(v) SETTINGS.Distance.Size = v end})
+
+    Library:Notify("Perk ESP loaded", "success")
+else
+    warn("[PerkESP] UI Library failed to load:", err)
+end
+
 local lastShot = 0
-local ValidParts = {"Head", "UpperTorso", "LowerTorso", "Torso", "LeftArm", "RightArm", "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperArm", "LeftLowerArm", "LeftHand"}
-local LegParts = {"LeftLeg", "RightLeg", "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg", "LeftFoot", "RightFoot"}
+local function GetHeadParts()
+    local t = SETTINGS.HeadParts
+    if type(t) ~= "table" or #t == 0 then return DEFAULT_SETTINGS.HeadParts end
+    return t
+end
+
+local function GetBodyParts()
+    local t = SETTINGS.BodyParts
+    if type(t) ~= "table" or #t == 0 then return DEFAULT_SETTINGS.BodyParts end
+    return t
+end
+
+local function GetLegParts()
+    local t = SETTINGS.LegParts
+    if type(t) ~= "table" or #t == 0 then return DEFAULT_SETTINGS.LegParts end
+    return t
+end
+
 local ESP_STORAGE = {}
 local CONNECTED_FOLDERS = {}
 
@@ -102,9 +189,10 @@ local function TrackDrawing(drawing)
 end
 
 local function checkPart(partName)
-    for _, name in pairs(ValidParts) do if partName == name then return true end end
+    for _, name in pairs(GetHeadParts()) do if partName == name then return true end end
+    for _, name in pairs(GetBodyParts()) do if partName == name then return true end end
     if SETTINGS.Triggerbot.ShootLegs then
-        for _, name in pairs(LegParts) do if partName == name then return true end end
+        for _, name in pairs(GetLegParts()) do if partName == name then return true end end
     end
     return false
 end
