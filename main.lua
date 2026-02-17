@@ -325,6 +325,31 @@ local function SetupPlayer(player)
     end))
 end
 
+local function AuditESP()
+    while true do
+        task.wait(3)
+
+        for char, data in pairs(ESP_STORAGE) do
+            local character = data.CachedChar
+            local hum = data.CachedHum
+
+            if not character or not character.Parent or not hum or hum.Health <= 0 then
+                RemoveESP(char)
+            else
+                if data.Player and (not Players:FindFirstChild(data.Player.Name) or data.Player.Character ~= character) then
+                    RemoveESP(char)
+                end
+            end
+        end
+
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and not ESP_STORAGE[p.Character] then
+                CreateESP(p, false)
+            end
+        end
+    end
+end
+
 local function InitializePerk()
     local char = WaitForLocalCharacter()
     if not char then return end
@@ -497,6 +522,8 @@ local function InitializePerk()
             end
         end
     end))
+
+    task.spawn(AuditESP)
 
     if SETTINGS.AutoExecuteOnTeleport then
         local queue_on_teleport_fn = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
