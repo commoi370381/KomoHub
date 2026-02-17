@@ -6,7 +6,6 @@ local StarterGui = game:GetService("StarterGui")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- CLEANUP OLD INSTANCES
 if _G.PerkESP then
     if _G.PerkESP.Connections then
         for _, connection in pairs(_G.PerkESP.Connections) do
@@ -27,7 +26,6 @@ _G.PerkESP = {
     Drawings = {}
 }
 
--- CONFIGURATION
 local DEFAULT_SETTINGS = {
     Enabled = true,
     TeamCheck = false,
@@ -83,9 +81,8 @@ local lastShot = 0
 local ValidParts = {"Head", "UpperTorso", "LowerTorso", "Torso", "LeftArm", "RightArm", "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperArm", "LeftLowerArm", "LeftHand"}
 local LegParts = {"LeftLeg", "RightLeg", "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg", "LeftFoot", "RightFoot"}
 local ESP_STORAGE = {}
-local CONNECTED_FOLDERS = {} -- Prevents double-connecting events
+local CONNECTED_FOLDERS = {}
 
--- 取得目前要監聽的 NPC 目標資料夾清單（自動處理舊設定 / 空表）
 local function GetTargetFolders()
     local tf = SETTINGS.TargetFolders
     if type(tf) ~= "table" or #tf == 0 then
@@ -94,7 +91,6 @@ local function GetTargetFolders()
     return tf
 end
 
--- Utility Functions
 local function AddConnection(connection)
     table.insert(_G.PerkESP.Connections, connection)
     return connection
@@ -143,7 +139,6 @@ local function ManageHighlight(character, shouldShow, color)
 end
 
 local function CreateESP(target, isNPC)
-    -- 玩家：target = Player，NPC：target = Model
     local character = isNPC and target or target.Character
     if not character or ESP_STORAGE[character] then return end
 
@@ -176,10 +171,8 @@ local function CreateESP(target, isNPC)
     drawings.Name.Center, drawings.Dist.Center, drawings.HealthText.Center = true, true, true
     drawings.Name.Outline, drawings.Dist.Outline, drawings.HealthText.Outline = true, true, true
 
-    -- 綁定此角色相關的生命週期事件以立即清理 ESP
     drawings.Connections[#drawings.Connections + 1] = AddConnection(character.AncestryChanged:Connect(function(_, parent)
         if not parent then
-            -- 角色整個被移除
             RemoveESP(character)
         end
     end))
@@ -195,7 +188,6 @@ local function RemoveESP(obj)
     local data = ESP_STORAGE[obj]
     if not data then return end
 
-    -- 先斷開此物件綁定的連線
     if data.Connections then
         for _, conn in ipairs(data.Connections) do
             if conn and conn.Disconnect then
@@ -204,14 +196,12 @@ local function RemoveESP(obj)
         end
     end
 
-    -- 關閉 Highlight（如果角色還存在）
     if data.CachedChar then
         pcall(function()
             ManageHighlight(data.CachedChar, false)
         end)
     end
 
-    -- 再移除所有 Drawing
     for _, drawing in pairs(data) do 
         if typeof(drawing) == "userdata" and drawing.Remove then 
             drawing.Visible = false 
@@ -238,7 +228,6 @@ local function CastPiercingRay(origin, direction, params, depth)
     return result
 end
 
--- 判斷並處理單一物件是否為可掛 ESP 的 NPC Model
 local function CheckItem(item)
     if not item:IsA("Model") then return end
     if ESP_STORAGE[item] then return end
@@ -246,7 +235,6 @@ local function CheckItem(item)
     local hum = item:FindFirstChildOfClass("Humanoid")
     if not hum or hum.Health <= 0 then return end
 
-    -- 排除玩家角色，只處理 NPC
     if Players:GetPlayerFromCharacter(item) then return end
 
     if getRoot(item) then
@@ -254,17 +242,10 @@ local function CheckItem(item)
     end
 end
 
--- 針對每個目標資料夾做事件式監聽（Infinite Yield 風格）
 local function SetupNPCFolder(folder)
     if not folder or CONNECTED_FOLDERS[folder] then return end
     CONNECTED_FOLDERS[folder] = true
 
-    -- 一次性掃描現有後代（不使用 while 迴圈）
-    for _, desc in ipairs(folder:GetDescendants()) do
-        CheckItem(desc)
-    end
-
-    -- 新後代出現時，即時檢查是否為 NPC Model
     AddConnection(folder.DescendantAdded:Connect(function(child)
         task.delay(0.05, function()
             if child and child:IsDescendantOf(folder) then
@@ -273,17 +254,14 @@ local function SetupNPCFolder(folder)
         end)
     end))
 
-    -- 任一後代被移除或整個 Model 被刪除時，立即清理對應 ESP
     AddConnection(folder.DescendantRemoving:Connect(function(child)
         if not child then return end
 
-        -- 直接是 NPC Model
         if ESP_STORAGE[child] then
             RemoveESP(child)
             return
         end
 
-        -- 可能是 Model 內的零件，反推擁有 Humanoid 的 Model
         local char = getChar(child)
         if char and ESP_STORAGE[char] then
             RemoveESP(char)
@@ -291,7 +269,6 @@ local function SetupNPCFolder(folder)
     end))
 end
 
--- 等待本地角色載入完成（避免剛進遊戲就執行）
 local function WaitForLocalCharacter()
     local char = LocalPlayer.Character
     if not char or not char.Parent then
@@ -309,7 +286,6 @@ end
 
 -- 初始化所有目標資料夾與未來新生成的資料夾
 local function InitNPCFolderEvents()
-    -- 先處理目前 workspace 下已存在的目標資料夾
     local targetFolders = GetTargetFolders()
     for _, name in ipairs(targetFolders) do
         local folder = workspace:FindFirstChild(name)
@@ -318,7 +294,6 @@ local function InitNPCFolderEvents()
         end
     end
 
-    -- 監聽之後才出現的目標資料夾（例如新區域載入）
     AddConnection(workspace.ChildAdded:Connect(function(child)
         if child and child:IsA("Folder") then
             local currentTargets = GetTargetFolders()
@@ -329,7 +304,6 @@ local function InitNPCFolderEvents()
     end))
 end
 
--- Setup Players
 local function SetupPlayer(player)
     if player == LocalPlayer then return end
     if player.Character then
@@ -341,29 +315,23 @@ local function SetupPlayer(player)
     end))
 end
 
--- 主初始化：等當前玩家角色載入後再啟動所有邏輯
 local function InitializePerk()
     local char = WaitForLocalCharacter()
     if not char then return end
 
-    -- 玩家 ESP 初始化
     for _, p in ipairs(Players:GetPlayers()) do
         SetupPlayer(p)
     end
     AddConnection(Players.PlayerAdded:Connect(SetupPlayer))
     AddConnection(Players.PlayerRemoving:Connect(function(p)
-        -- 只要玩家物件或其角色存在，就一併清理
         if p.Character then
             RemoveESP(p.Character)
         end
     end))
 
-    -- 啟用基於事件的 NPC 監聽（Infinite Yield 風格）
     InitNPCFolderEvents()
 
-    -- RENDER LOGIC
     AddConnection(RunService.RenderStepped:Connect(function()
-        -- 若 Triggerbot 關閉且沒有任何 ESP 物件，直接略過本幀
         if not SETTINGS.Triggerbot.Enabled and not SETTINGS.Enabled then
             return
         end
@@ -372,7 +340,6 @@ local function InitializePerk()
         local camPos = Camera.CFrame.Position
         local fovFactor = math.tan(math.rad(Camera.FieldOfView / 2)) * 2
 
-        -- TRIGGERBOT
         if SETTINGS.Triggerbot.Enabled and UIS:IsMouseButtonPressed(SETTINGS.Triggerbot.ActiveKey) then
             local mousePos = UIS:GetMouseLocation()
             local ray = Camera:ViewportPointToRay(mousePos.X, mousePos.Y)
@@ -404,7 +371,6 @@ local function InitializePerk()
             end
         end
 
-        -- ESP RENDER
         if SETTINGS.Enabled and hasESP then
             for char, drawings in pairs(ESP_STORAGE) do
                 local character = drawings.CachedChar
@@ -482,14 +448,11 @@ local function InitializePerk()
         end
     end))
 
-    -- TELEPORT HANDLER（固定載入 KomoHub main.lua）
     if SETTINGS.AutoExecuteOnTeleport then
         local queue_on_teleport_fn = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
         if queue_on_teleport_fn then
-            -- 先直接 queue 一次，確保下一次 teleport 無論是否觸發 OnTeleport 都會自動執行
             queue_on_teleport_fn([[loadstring(game:HttpGet("https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/main.lua"))()]])
 
-            -- 再加上事件監聽作為保險，有些執行器在 TeleportState.Started 之後仍會接受 queue 內容
             AddConnection(LocalPlayer.OnTeleport:Connect(function(state)
                 if state == Enum.TeleportState.Started then
                     queue_on_teleport_fn([[loadstring(game:HttpGet("https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/main.lua"))()]])
@@ -501,5 +464,4 @@ local function InitializePerk()
     StarterGui:SetCore("SendNotification", {Title = "LOADED", Text = "Script Active", Duration = 5})
 end
 
--- 直接在主執行緒執行初始化，內部會自行等待角色載入
 pcall(InitializePerk)
