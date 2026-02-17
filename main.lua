@@ -33,9 +33,15 @@ local DEFAULT_SETTINGS = {
     TeamCheck = false,
     MaxRenderDistance = 800, 
     
-    -- Auto-Execute Logic (Save script to autoexec folder for best results)
     AutoExecuteOnTeleport = true,
-    MyScriptURL = "", -- 已不再使用，保留只是為了相容舊設定
+
+    TargetFolders = {
+        "ShootingRangeEntities",
+        "Mobs",
+        "NPCs",
+        "Enemies",
+        "Dummies"
+    },
 
     Triggerbot = {
         Enabled = true,
@@ -44,7 +50,7 @@ local DEFAULT_SETTINGS = {
         ShootLegs = true,
         ClickDelay = 0.08, 
         WhitelistEnabled = true,
-        Whitelist = {"SunSand_Stick"},
+        Whitelist = {},
         MaxDistance = 800,
     },
 
@@ -70,17 +76,8 @@ local DEFAULT_SETTINGS = {
     }
 }
 
--- 讓設定變成全域，在腳本多次執行之間持久化
 local SETTINGS = _G.PerkESP_Settings or DEFAULT_SETTINGS
 _G.PerkESP_Settings = SETTINGS
-
-local TARGET_FOLDER_NAMES = {
-    "ShootingRangeEntities",
-    "Mobs",
-    "NPCs",
-    "Enemies",
-    "Dummies"
-}
 
 local lastShot = 0
 local ValidParts = {"Head", "UpperTorso", "LowerTorso", "Torso", "LeftArm", "RightArm", "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperArm", "LeftLowerArm", "LeftHand"}
@@ -184,6 +181,11 @@ local function CreateESP(obj, isNPC)
     end))
 
     ESP_STORAGE[obj] = drawings
+
+    -- 玩家也用 Character 當 key 做一份別名，方便從 Model 端清理
+    if not isNPC then
+        ESP_STORAGE[character] = drawings
+    end
 end
 
 local function RemoveESP(obj)
@@ -197,6 +199,12 @@ local function RemoveESP(obj)
                 end
             end
         end
+        -- 關閉 Highlight（如果角色還存在）
+        if data.CachedChar then
+            pcall(function()
+                ManageHighlight(data.CachedChar, false)
+            end)
+        end
         -- 再移除所有 Drawing
         for _, drawing in pairs(data) do 
             if typeof(drawing) == "userdata" and drawing.Remove then 
@@ -204,7 +212,12 @@ local function RemoveESP(obj)
                 drawing:Remove() 
             end 
         end
-        ESP_STORAGE[obj] = nil
+        -- 移除所有指向同一份 data 的索引（例如 Player 與 Character 的雙 key）
+        for key, value in pairs(ESP_STORAGE) do
+            if value == data then
+                ESP_STORAGE[key] = nil
+            end
+        end
     end
 end
 
@@ -280,7 +293,8 @@ end
 -- 初始化所有目標資料夾與未來新生成的資料夾
 local function InitNPCFolderEvents()
     -- 先處理目前 workspace 下已存在的目標資料夾
-    for _, name in ipairs(TARGET_FOLDER_NAMES) do
+    local targetFolders = SETTINGS.TargetFolders or DEFAULT_SETTINGS.TargetFolders
+    for _, name in ipairs(targetFolders) do
         local folder = workspace:FindFirstChild(name)
         if folder then
             SetupNPCFolder(folder)
@@ -289,8 +303,11 @@ local function InitNPCFolderEvents()
 
     -- 監聽之後才出現的目標資料夾（例如新區域載入）
     AddConnection(workspace.ChildAdded:Connect(function(child)
-        if child and child:IsA("Folder") and table.find(TARGET_FOLDER_NAMES, child.Name) then
-            SetupNPCFolder(child)
+        if child and child:IsA("Folder") then
+            local currentTargets = SETTINGS.TargetFolders or DEFAULT_SETTINGS.TargetFolders
+            if table.find(currentTargets, child.Name) then
+                SetupNPCFolder(child)
+            end
         end
     end))
 end
@@ -458,6 +475,10 @@ end))
 if SETTINGS.AutoExecuteOnTeleport then
     local queue_on_teleport_fn = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
     if queue_on_teleport_fn then
+        -- 先直接 queue 一次，確保下一次 teleport 無論是否觸發 OnTeleport 都會自動執行
+        queue_on_teleport_fn([[loadstring(game:HttpGet("https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/main.lua"))()]])
+
+        -- 再加上事件監聽作為保險，有些執行器在 TeleportState.Started 之後仍會接受 queue 內容
         AddConnection(LocalPlayer.OnTeleport:Connect(function(state)
             if state == Enum.TeleportState.Started then
                 queue_on_teleport_fn([[loadstring(game:HttpGet("https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/main.lua"))()]])
