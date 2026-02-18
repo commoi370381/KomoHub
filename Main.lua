@@ -156,7 +156,7 @@ local success, err = pcall(function()
     _G.Library = Library
 end)
 if success and _G.Library then
-    _G.Library.MenuKey = Enum.KeyCode.Insert
+    _G.Library.MenuKey = Enum.KeyCode.End
     if not SETTINGS.PlayerESP.Name then SETTINGS.PlayerESP.Name = { Enabled = true, Size = 16 } end
     if not SETTINGS.PlayerESP.Distance then SETTINGS.PlayerESP.Distance = { Enabled = true, Color = Color3.fromRGB(255,255,255), Size = 14 } end
     if not SETTINGS.PlayerESP.Health then SETTINGS.PlayerESP.Health = { Box = { Enabled = true }, Text = { Enabled = true, Size = 13 } } end
