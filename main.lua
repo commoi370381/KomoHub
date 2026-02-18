@@ -93,6 +93,9 @@ local DEFAULT_SETTINGS = {
 local SETTINGS = _G.PerkESP_Settings or DEFAULT_SETTINGS
 _G.PerkESP_Settings = SETTINGS
 
+local ESP_STORAGE = {}
+local CONNECTED_FOLDERS = {}
+
 -- Load UI Library (loadstring from GitHub)
 local UI_LIB_URL = "https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/UI%20Library"
 local Library = nil
@@ -297,9 +300,6 @@ local function GetLegParts()
     if type(t) ~= "table" or #t == 0 then return DEFAULT_SETTINGS.LegParts end
     return t
 end
-
-local ESP_STORAGE = {}
-local CONNECTED_FOLDERS = {}
 
 local function GetTargetFolders()
     local tf = SETTINGS.TargetFolders
