@@ -62,7 +62,9 @@ local DEFAULT_SETTINGS = {
         HighlightColor = Color3.fromRGB(255, 0, 0),
         Name = { Enabled = true, Size = 16 },
         Distance = { Enabled = true, Color = Color3.fromRGB(255, 255, 255), Size = 14 },
-        Health = { Box = { Enabled = true }, Text = { Enabled = true } }
+        Health = { Box = { Enabled = true }, Text = { Enabled = true, Size = 13 } },
+        WhitelistEnabled = false,
+        Whitelist = {}
     },
 
     NPC_ESP = {
@@ -71,7 +73,9 @@ local DEFAULT_SETTINGS = {
         HighlightColor = Color3.fromRGB(255, 165, 0),
         Name = { Enabled = true, Size = 16 },
         Distance = { Enabled = true, Color = Color3.fromRGB(255, 255, 255), Size = 14 },
-        Health = { Box = { Enabled = true }, Text = { Enabled = true } }
+        Health = { Box = { Enabled = true }, Text = { Enabled = true, Size = 13 } },
+        WhitelistEnabled = false,
+        Whitelist = {}
     },
 
     Highlight = { Enabled = true, FillTransparency = 0.5, OutlineTransparency = 0 },
@@ -97,10 +101,14 @@ if success and Library then
     Library.MenuKey = Enum.KeyCode.Insert
     if not SETTINGS.PlayerESP.Name then SETTINGS.PlayerESP.Name = { Enabled = true, Size = 16 } end
     if not SETTINGS.PlayerESP.Distance then SETTINGS.PlayerESP.Distance = { Enabled = true, Color = Color3.fromRGB(255,255,255), Size = 14 } end
-    if not SETTINGS.PlayerESP.Health then SETTINGS.PlayerESP.Health = { Box = { Enabled = true }, Text = { Enabled = true } } end
+    if not SETTINGS.PlayerESP.Health then SETTINGS.PlayerESP.Health = { Box = { Enabled = true }, Text = { Enabled = true, Size = 13 } } end
+    if not SETTINGS.PlayerESP.WhitelistEnabled then SETTINGS.PlayerESP.WhitelistEnabled = false end
+    if not SETTINGS.PlayerESP.Whitelist then SETTINGS.PlayerESP.Whitelist = {} end
     if not SETTINGS.NPC_ESP.Name then SETTINGS.NPC_ESP.Name = { Enabled = true, Size = 16 } end
     if not SETTINGS.NPC_ESP.Distance then SETTINGS.NPC_ESP.Distance = { Enabled = true, Color = Color3.fromRGB(255,255,255), Size = 14 } end
-    if not SETTINGS.NPC_ESP.Health then SETTINGS.NPC_ESP.Health = { Box = { Enabled = true }, Text = { Enabled = true } } end
+    if not SETTINGS.NPC_ESP.Health then SETTINGS.NPC_ESP.Health = { Box = { Enabled = true }, Text = { Enabled = true, Size = 13 } } end
+    if not SETTINGS.NPC_ESP.WhitelistEnabled then SETTINGS.NPC_ESP.WhitelistEnabled = false end
+    if not SETTINGS.NPC_ESP.Whitelist then SETTINGS.NPC_ESP.Whitelist = {} end
 
     local MainTab = Library:Tab("Perk ESP", 10455603612)
 
@@ -112,7 +120,16 @@ if success and Library then
     GeneralGroup:Slider({Name = "Max Render Distance", Min = 100, Max = 2000, Default = SETTINGS.MaxRenderDistance, Unit = " studs", Callback = function(v) SETTINGS.MaxRenderDistance = v end})
 
     local PlayerESPGroup = MainTab:Group("Player ESP")
-    local pEspTog = PlayerESPGroup:Toggle({Name = "Player ESP", Callback = function(v) SETTINGS.PlayerESP.Enabled = v end})
+    local pEspTog = PlayerESPGroup:Toggle({Name = "Player ESP", Callback = function(v)
+        SETTINGS.PlayerESP.Enabled = v
+        if v and SETTINGS.Enabled then
+            task.defer(function()
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and p.Character and not ESP_STORAGE[p.Character] then CreateESP(p, false) end
+                end
+            end)
+        end
+    end})
     pEspTog.Set(SETTINGS.PlayerESP.Enabled)
     PlayerESPGroup:ColorPicker({Name = "Box Color", Default = SETTINGS.PlayerESP.BoxColor, Callback = function(c) SETTINGS.PlayerESP.BoxColor = c end})
     PlayerESPGroup:ColorPicker({Name = "Highlight", Default = SETTINGS.PlayerESP.HighlightColor, Callback = function(c) SETTINGS.PlayerESP.HighlightColor = c end})
@@ -123,13 +140,30 @@ if success and Library then
     pDistTog.Set(SETTINGS.PlayerESP.Distance.Enabled)
     PlayerESPGroup:Slider({Name = "Distance Size", Min = 10, Max = 20, Default = SETTINGS.PlayerESP.Distance.Size, Callback = function(v) SETTINGS.PlayerESP.Distance.Size = v end})
     PlayerESPGroup:ColorPicker({Name = "Distance Color", Default = SETTINGS.PlayerESP.Distance.Color, Callback = function(c) SETTINGS.PlayerESP.Distance.Color = c end})
-    local pHpBoxTog = PlayerESPGroup:Toggle({Name = "Health Bar", Callback = function(v) SETTINGS.PlayerESP.Health.Box.Enabled = v end})
+    local     pHpBoxTog = PlayerESPGroup:Toggle({Name = "Health Bar", Callback = function(v) SETTINGS.PlayerESP.Health.Box.Enabled = v end})
     pHpBoxTog.Set(SETTINGS.PlayerESP.Health.Box.Enabled)
     local pHpTextTog = PlayerESPGroup:Toggle({Name = "Health Text", Callback = function(v) SETTINGS.PlayerESP.Health.Text.Enabled = v end})
     pHpTextTog.Set(SETTINGS.PlayerESP.Health.Text.Enabled)
+    if not SETTINGS.PlayerESP.Health.Text.Size then SETTINGS.PlayerESP.Health.Text.Size = 13 end
+    PlayerESPGroup:Slider({Name = "Health Text Size", Min = 8, Max = 24, Default = SETTINGS.PlayerESP.Health.Text.Size, Callback = function(v) SETTINGS.PlayerESP.Health.Text.Size = v end})
+    local pWlTog = PlayerESPGroup:Toggle({Name = "Whitelist Enabled", Tooltip = "Hide ESP for whitelisted players", Callback = function(v) SETTINGS.PlayerESP.WhitelistEnabled = v end})
+    pWlTog.Set(SETTINGS.PlayerESP.WhitelistEnabled)
+    PlayerESPGroup:Textbox({Name = "Whitelist (comma-separated)", Default = table.concat(SETTINGS.PlayerESP.Whitelist or {}, ", "), Placeholder = "Player1, Player2", Callback = function(txt) SETTINGS.PlayerESP.Whitelist = parseWhitelistStr(txt) end})
 
     local NPCESPGroup = MainTab:Group("NPC ESP")
-    local npcEspTog = NPCESPGroup:Toggle({Name = "NPC ESP", Callback = function(v) SETTINGS.NPC_ESP.Enabled = v end})
+    local npcEspTog = NPCESPGroup:Toggle({Name = "NPC ESP", Callback = function(v)
+        SETTINGS.NPC_ESP.Enabled = v
+        if v and SETTINGS.Enabled then
+            task.defer(function()
+                for _, name in ipairs(GetTargetFolders()) do
+                    local folder = workspace:FindFirstChild(name)
+                    if folder then
+                        for _, desc in ipairs(folder:GetDescendants()) do CheckItem(desc) end
+                    end
+                end
+            end)
+        end
+    end})
     npcEspTog.Set(SETTINGS.NPC_ESP.Enabled)
     NPCESPGroup:ColorPicker({Name = "Box Color", Default = SETTINGS.NPC_ESP.BoxColor, Callback = function(c) SETTINGS.NPC_ESP.BoxColor = c end})
     NPCESPGroup:ColorPicker({Name = "Highlight", Default = SETTINGS.NPC_ESP.HighlightColor, Callback = function(c) SETTINGS.NPC_ESP.HighlightColor = c end})
@@ -140,10 +174,15 @@ if success and Library then
     nDistTog.Set(SETTINGS.NPC_ESP.Distance.Enabled)
     NPCESPGroup:Slider({Name = "Distance Size", Min = 10, Max = 20, Default = SETTINGS.NPC_ESP.Distance.Size, Callback = function(v) SETTINGS.NPC_ESP.Distance.Size = v end})
     NPCESPGroup:ColorPicker({Name = "Distance Color", Default = SETTINGS.NPC_ESP.Distance.Color, Callback = function(c) SETTINGS.NPC_ESP.Distance.Color = c end})
-    local nHpBoxTog = NPCESPGroup:Toggle({Name = "Health Bar", Callback = function(v) SETTINGS.NPC_ESP.Health.Box.Enabled = v end})
+    local     nHpBoxTog = NPCESPGroup:Toggle({Name = "Health Bar", Callback = function(v) SETTINGS.NPC_ESP.Health.Box.Enabled = v end})
     nHpBoxTog.Set(SETTINGS.NPC_ESP.Health.Box.Enabled)
     local nHpTextTog = NPCESPGroup:Toggle({Name = "Health Text", Callback = function(v) SETTINGS.NPC_ESP.Health.Text.Enabled = v end})
     nHpTextTog.Set(SETTINGS.NPC_ESP.Health.Text.Enabled)
+    if not SETTINGS.NPC_ESP.Health.Text.Size then SETTINGS.NPC_ESP.Health.Text.Size = 13 end
+    NPCESPGroup:Slider({Name = "Health Text Size", Min = 8, Max = 24, Default = SETTINGS.NPC_ESP.Health.Text.Size, Callback = function(v) SETTINGS.NPC_ESP.Health.Text.Size = v end})
+    local nWlTog = NPCESPGroup:Toggle({Name = "Whitelist Enabled", Tooltip = "Hide ESP for whitelisted NPCs by name", Callback = function(v) SETTINGS.NPC_ESP.WhitelistEnabled = v end})
+    nWlTog.Set(SETTINGS.NPC_ESP.WhitelistEnabled)
+    NPCESPGroup:Textbox({Name = "Whitelist (comma-separated)", Default = table.concat(SETTINGS.NPC_ESP.Whitelist or {}, ", "), Placeholder = "NPC1, Dummy", Callback = function(txt) SETTINGS.NPC_ESP.Whitelist = parseWhitelistStr(txt) end})
 
     local VisualsGroup = MainTab:Group("Visuals (Global)")
     local hTog = VisualsGroup:Toggle({Name = "Highlight", Callback = function(v) SETTINGS.Highlight.Enabled = v end})
@@ -174,6 +213,14 @@ if success and Library then
     local teleTog = SettingsGroup:Toggle({Name = "Auto Execute On Teleport", Tooltip = "Re-run script after teleport", Callback = function(v) SETTINGS.AutoExecuteOnTeleport = v end})
     teleTog.Set(SETTINGS.AutoExecuteOnTeleport)
     SettingsGroup:Button({Name = "Unload", Variant = "Danger", Tooltip = "Stop script and close UI", Callback = function()
+        for char, data in pairs(ESP_STORAGE) do
+            if data and data.CachedChar then
+                pcall(function()
+                    local h = data.CachedChar:FindFirstChild("PerkHighlight")
+                    if h then h:Destroy() end
+                end)
+            end
+        end
         for _, conn in pairs(_G.PerkESP and _G.PerkESP.Connections or {}) do
             pcall(function() conn:Disconnect() end)
         end
@@ -250,6 +297,24 @@ local function isWhitelisted(char, player)
     return false
 end
 
+local function isESPWhitelisted(char, player, config)
+    if not config or not config.WhitelistEnabled then return false end
+    local wl = config.Whitelist
+    if type(wl) ~= "table" or #wl == 0 then return false end
+    if player and table.find(wl, player.Name) then return true end
+    if char and table.find(wl, char.Name) then return true end
+    return false
+end
+
+local function parseWhitelistStr(str)
+    local out = {}
+    for s in string.gmatch(str:gsub("%s+", " "):gsub("^%s*(.-)%s*$", "%1"), "[^,]+") do
+        local name = s:match("^%s*(.-)%s*$")
+        if #name > 0 and not table.find(out, name) then table.insert(out, name) end
+    end
+    return out
+end
+
 local function getRoot(model)
     return model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Torso") or model.PrimaryPart
 end
@@ -314,7 +379,10 @@ local function CreateESP(target, isNPC)
     }
 
     for _, d in pairs(drawings) do
-        if typeof(d) == "userdata" then d.Visible = false end
+        if typeof(d) == "userdata" then
+            d.Visible = false
+            pcall(function() d.ZIndex = 0 end)
+        end
     end
 
     drawings.Box.Filled = false
@@ -526,6 +594,7 @@ local function InitializePerk()
     for _, p in ipairs(Players:GetPlayers()) do
         SetupPlayer(p)
     end
+
     AddConnection(Players.PlayerAdded:Connect(SetupPlayer))
     AddConnection(Players.PlayerRemoving:Connect(function(p)
         if p.Character then
@@ -535,8 +604,18 @@ local function InitializePerk()
 
     InitNPCFolderEvents()
 
-    AddConnection(RunService.RenderStepped:Connect(function()
+    local renderConn = RunService.RenderStepped:Connect(function()
         if not SETTINGS.Enabled then
+            for _, drawings in pairs(ESP_STORAGE) do
+                for _, d in pairs(drawings) do
+                    if typeof(d) == "userdata" and d.Visible then
+                        d.Visible = false
+                    end
+                end
+                if drawings.CachedChar then
+                    pcall(function() ManageHighlight(drawings.CachedChar, false) end)
+                end
+            end
             return
         end
 
@@ -550,13 +629,13 @@ local function InitializePerk()
             local params = RaycastParams.new()
             params.FilterType = Enum.RaycastFilterType.Exclude
             params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-            
+
             local result = CastPiercingRay(ray.Origin, ray.Direction * SETTINGS.Triggerbot.MaxDistance, params)
             if result and result.Instance then
                 local c = getChar(result.Instance)
                 if c and c ~= LocalPlayer.Character then
                     local dist = (camPos - result.Position).Magnitude
-                    if dist <= SETTINGS.MaxRenderDistance then 
+                    if dist <= SETTINGS.MaxRenderDistance then
                         local hum = c:FindFirstChildOfClass("Humanoid")
                         if hum and hum.Health > 0 then
                             local targetP = Players:GetPlayerFromCharacter(c)
@@ -607,66 +686,72 @@ local function InitializePerk()
                         end
 
                         if root and root.Parent and hum and hum.Health > 0 and config.Enabled then
-                            local rootPos = root.Position
-                            local dist = (camPos - rootPos).Magnitude
-                            
-                            if dist <= SETTINGS.MaxRenderDistance then
-                                local screenPos, onScreen = Camera:WorldToViewportPoint(rootPos)
-                                
-                                if onScreen then
-                                    isActuallyVisible = true
-                                    ManageHighlight(character, true, config.HighlightColor)
+                            if isESPWhitelisted(character, drawings.Player, config) then
+                                if character then ManageHighlight(character, false) end
+                            else
+                                local rootPos = root.Position
+                                local dist = (camPos - rootPos).Magnitude
 
-                                    local nameEnabled = getVisual(config, "Name", "Enabled", true)
-                                    local nameSize = getVisual(config, "Name", "Size", 16)
-                                    local distEnabled = getVisual(config, "Distance", "Enabled", true)
-                                    local distSize = getVisual(config, "Distance", "Size", 14)
-                                    local distColor = getVisual(config, "Distance", "Color", SETTINGS.Distance.Color)
-                                    local healthBoxEnabled = (config.Health and config.Health.Box and config.Health.Box.Enabled ~= nil) and config.Health.Box.Enabled or SETTINGS.Health.Box.Enabled
-                                    local healthTextEnabled = (config.Health and config.Health.Text and config.Health.Text.Enabled ~= nil) and config.Health.Text.Enabled or SETTINGS.Health.Text.Enabled
+                                if dist <= SETTINGS.MaxRenderDistance then
+                                    local screenPos, onScreen = Camera:WorldToViewportPoint(rootPos)
 
-                                    local scale = 1 / (dist * fovFactor) * 1000
-                                    local w, h = scale * 6, scale * 8
-                                    local x, y = screenPos.X - w/2, screenPos.Y - h/2
+                                    if onScreen then
+                                        isActuallyVisible = true
+                                        ManageHighlight(character, true, config.HighlightColor)
 
-                                    drawings.Box.Visible = SETTINGS.Box.Enabled
-                                    drawings.Box.Size = Vector2.new(w, h)
-                                    drawings.Box.Position = Vector2.new(x, y)
-                                    drawings.Box.Color = config.BoxColor
+                                        local nameEnabled = getVisual(config, "Name", "Enabled", true)
+                                        local nameSize = getVisual(config, "Name", "Size", 16)
+                                        local distEnabled = getVisual(config, "Distance", "Enabled", true)
+                                        local distSize = getVisual(config, "Distance", "Size", 14)
+                                        local distColor = getVisual(config, "Distance", "Color", SETTINGS.Distance.Color)
+                                        local healthBoxEnabled = (config.Health and config.Health.Box and config.Health.Box.Enabled ~= nil) and config.Health.Box.Enabled or SETTINGS.Health.Box.Enabled
+                                        local healthTextEnabled = (config.Health and config.Health.Text and config.Health.Text.Enabled ~= nil) and config.Health.Text.Enabled or SETTINGS.Health.Text.Enabled
+                                        local healthTextSize = (config.Health and config.Health.Text and config.Health.Text.Size) or SETTINGS.Health.Text.Size or 13
 
-                                    drawings.Name.Visible = nameEnabled
-                                    drawings.Name.Size = nameSize
-                                    if drawings.IsNPC then
-                                        drawings.Name.Text = "[NPC] " .. character.Name
-                                    elseif drawings.Player then
-                                        drawings.Name.Text = drawings.Player.Name
-                                    else
-                                        drawings.Name.Text = character.Name
+                                        local scale = 1 / (dist * fovFactor) * 1000
+                                        local w, h = scale * 6, scale * 8
+                                        local x, y = screenPos.X - w/2, screenPos.Y - h/2
+
+                                        drawings.Box.Visible = SETTINGS.Box.Enabled
+                                        drawings.Box.Size = Vector2.new(w, h)
+                                        drawings.Box.Position = Vector2.new(x, y)
+                                        drawings.Box.Color = config.BoxColor
+
+                                        drawings.Name.Visible = nameEnabled
+                                        drawings.Name.Size = nameSize
+                                        if drawings.IsNPC then
+                                            drawings.Name.Text = "[NPC] " .. character.Name
+                                        elseif drawings.Player then
+                                            drawings.Name.Text = drawings.Player.Name
+                                        else
+                                            drawings.Name.Text = character.Name
+                                        end
+                                        drawings.Name.Position = Vector2.new(screenPos.X, y - 20)
+                                        drawings.Name.Color = config.BoxColor
+
+                                        local healthP = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+
+                                        drawings.HealthBg.Visible = healthBoxEnabled
+                                        drawings.HealthBg.Size = Vector2.new(w, 5)
+                                        drawings.HealthBg.Position = Vector2.new(x, y + h + 5)
+
+                                        drawings.HealthMain.Visible = healthBoxEnabled
+                                        drawings.HealthMain.Size = Vector2.new(w * healthP, 5)
+                                        drawings.HealthMain.Position = Vector2.new(x, y + h + 5)
+                                        drawings.HealthMain.Color = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), healthP)
+
+                                        drawings.HealthText.Visible = healthTextEnabled
+                                        drawings.HealthText.Size = healthTextSize
+                                        drawings.HealthText.Text = string.format("HP: %d%%", math.floor(healthP * 100))
+                                        drawings.HealthText.Position = Vector2.new(screenPos.X, y + h + 15)
+                                        drawings.HealthText.Color = Color3.fromRGB(0, 255, 0)
+
+                                        drawings.Dist.Visible = distEnabled
+                                        drawings.Dist.Size = distSize
+                                        drawings.Dist.Text = math.floor(dist) .. " studs"
+                                        drawings.Dist.Position = Vector2.new(screenPos.X, y + h + 25)
+                                        drawings.Dist.Color = distColor
                                     end
-                                    drawings.Name.Position = Vector2.new(screenPos.X, y - 20)
-                                    drawings.Name.Color = config.BoxColor
-
-                                    local healthP = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-
-                                    drawings.HealthBg.Visible = healthBoxEnabled
-                                    drawings.HealthBg.Size = Vector2.new(w, 5)
-                                    drawings.HealthBg.Position = Vector2.new(x, y + h + 5)
-
-                                    drawings.HealthMain.Visible = healthBoxEnabled
-                                    drawings.HealthMain.Size = Vector2.new(w * healthP, 5)
-                                    drawings.HealthMain.Position = Vector2.new(x, y + h + 5)
-                                    drawings.HealthMain.Color = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), healthP)
-
-                                    drawings.HealthText.Visible = healthTextEnabled
-                                    drawings.HealthText.Text = string.format("HP: %d%%", math.floor(healthP * 100))
-                                    drawings.HealthText.Position = Vector2.new(screenPos.X, y + h + 15)
-                                    drawings.HealthText.Color = Color3.fromRGB(0, 255, 0)
-
-                                    drawings.Dist.Visible = distEnabled
-                                    drawings.Dist.Size = distSize
-                                    drawings.Dist.Text = math.floor(dist) .. " studs"
-                                    drawings.Dist.Position = Vector2.new(screenPos.X, y + h + 25)
-                                    drawings.Dist.Color = distColor
                                 end
                             end
                         else
@@ -686,8 +771,8 @@ local function InitializePerk()
                 end
             end
 
-            for _, char in ipairs(toRemove) do
-                RemoveESP(char)
+            for _, charRemove in ipairs(toRemove) do
+                RemoveESP(charRemove)
             end
 
             if #toRespawn > 0 then
@@ -700,20 +785,20 @@ local function InitializePerk()
                 end
             end
         end
-    end))
+    end)
+    AddConnection(renderConn)
 
     task.spawn(AuditESP)
 
     if SETTINGS.AutoExecuteOnTeleport then
         local queue_on_teleport_fn = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
         if queue_on_teleport_fn then
-            queue_on_teleport_fn([[loadstring(game:HttpGet("https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/main.lua"))()]])
-
-            AddConnection(LocalPlayer.OnTeleport:Connect(function(state)
+            local teleportConn = LocalPlayer.OnTeleport:Connect(function(state)
                 if state == Enum.TeleportState.Started then
-                    queue_on_teleport_fn([[loadstring(game:HttpGet("https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/main.lua"))()]])
+                    queue_on_teleport_fn([[loadstring(game:HttpGet("https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/Main.lua"))()]])
                 end
-            end))
+            end)
+            AddConnection(teleportConn)
         end
     end
 

@@ -49,6 +49,7 @@ local ScreenGui = Create("ScreenGui", {
     Name = "KomoHubUI",
     Parent = game:GetService("CoreGui"),
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    DisplayOrder = 1000,
     ResetOnSpawn = false,
     IgnoreGuiInset = true
 })
@@ -826,7 +827,7 @@ function Library:Tab(name, icon)
                 BackgroundColor3 = CFG.SecondaryColor,
                 TextColor3 = CFG.TextColor,
                 PlaceholderText = cfg.Placeholder or "...",
-                Text = "",
+                Text = cfg.Default or "",
                 Font = CFG.Font,
                 TextSize = 11,
                 BorderSizePixel = 0
