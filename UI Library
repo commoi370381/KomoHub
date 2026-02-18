@@ -23,7 +23,7 @@ end
 local VirtualInputManager    = Instance.new("VirtualInputManager")
 
 local Mouse = LocalPlayer:GetMouse()
-local ViewportSize = workspace.CurrentCamera.ViewportSize
+local ViewportSize = Camera.ViewportSize
 
 local CFG = {
     MainColor = Color3.fromRGB(14, 14, 14),
@@ -73,14 +73,14 @@ local ScreenGui = Create("ScreenGui", {
 local UIScale = Create("UIScale", {Parent = ScreenGui})
 
 local function UpdateScale()
-    local vp = workspace.CurrentCamera.ViewportSize
+    local vp = Camera.ViewportSize
     local widthRatio = (vp.X - 40) / CFG.BaseSize.X
     local heightRatio = (vp.Y - 40) / CFG.BaseSize.Y
     local scale = math.min(widthRatio, heightRatio, 1)
     UIScale.Scale = math.max(scale, 0.6)
 end
 
-workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateScale)
+Camera:GetPropertyChangedSignal("ViewportSize"):Connect(UpdateScale)
 UpdateScale()
 
 local NotificationContainer = Create("Frame", {

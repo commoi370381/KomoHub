@@ -176,7 +176,7 @@ if success and _G.Library then
                     if p ~= LocalPlayer and p.Character and not ESP_STORAGE[p.Character] then CreateESP(p, false) end
                 end
                 for _, name in ipairs(GetTargetFolders()) do
-                    local folder = workspace:FindFirstChild(name)
+                    local folder = Workspace:FindFirstChild(name)
                     if folder then
                         for _, desc in ipairs(folder:GetDescendants()) do CheckItem(desc) end
                     end
@@ -226,7 +226,7 @@ if success and _G.Library then
         if v and SETTINGS.Enabled then
             task.defer(function()
                 for _, name in ipairs(GetTargetFolders()) do
-                    local folder = workspace:FindFirstChild(name)
+                    local folder = Workspace:FindFirstChild(name)
                     if folder then
                         for _, desc in ipairs(folder:GetDescendants()) do CheckItem(desc) end
                     end
@@ -388,7 +388,7 @@ end
 
 local function getChar(part)
     local current = part
-    while current and current ~= workspace do
+    while current and current ~= Workspace do
         if current:IsA("Model") and current:FindFirstChildOfClass("Humanoid") then return current end
         current = current.Parent
     end
@@ -515,7 +515,7 @@ end
 local function CastPiercingRay(origin, direction, params, depth)
     depth = depth or 0
     if depth > 3 then return nil end 
-    local result = workspace:Raycast(origin, direction, params)
+    local result = Workspace:Raycast(origin, direction, params)
     if result then
         local hit = result.Instance
         local char = getChar(hit)
@@ -602,13 +602,13 @@ end
 local function InitNPCFolderEvents()
     local targetFolders = GetTargetFolders()
     for _, name in ipairs(targetFolders) do
-        local folder = workspace:FindFirstChild(name)
+        local folder = Workspace:FindFirstChild(name)
         if folder then
             SetupNPCFolder(folder)
         end
     end
 
-    AddConnection(workspace.ChildAdded:Connect(function(child)
+    AddConnection(Workspace.ChildAdded:Connect(function(child)
         if child and child:IsA("Folder") then
             local currentTargets = GetTargetFolders()
             if table.find(currentTargets, child.Name) then
@@ -638,7 +638,7 @@ local function AuditESP()
             local character = data.CachedChar
             local hum = data.CachedHum
 
-            if not character or not character:IsDescendantOf(workspace) or not hum or hum.Health <= 0 then
+            if not character or not character:IsDescendantOf(Workspace) or not hum or hum.Health <= 0 then
                 RemoveESP(char)
             else
                 if data.Player and (not Players:FindFirstChild(data.Player.Name) or data.Player.Character ~= character) then
@@ -702,8 +702,8 @@ local function InitializePerk()
         local camPos = Camera.CFrame.Position
         local fovFactor = math.tan(math.rad(Camera.FieldOfView / 2)) * 2
 
-        if SETTINGS.Triggerbot.Enabled and UIS:IsMouseButtonPressed(SETTINGS.Triggerbot.ActiveKey) then
-            local mousePos = UIS:GetMouseLocation()
+        if SETTINGS.Triggerbot.Enabled and UserInputService:IsMouseButtonPressed(SETTINGS.Triggerbot.ActiveKey) then
+            local mousePos = UserInputService:GetMouseLocation()
             local ray = Camera:ViewportPointToRay(mousePos.X, mousePos.Y)
             local params = RaycastParams.new()
             params.FilterType = Enum.RaycastFilterType.Exclude
