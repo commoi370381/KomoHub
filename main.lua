@@ -51,7 +51,7 @@ local DEFAULT_SETTINGS = {
         ActiveKey = Enum.UserInputType.MouseButton2,
         ShootLegs = true,
         ClickDelay = 0.08, 
-        WhitelistEnabled = true,
+        WhitelistEnabled = false,
         Whitelist = {},
         MaxDistance = 800,
     },
@@ -82,6 +82,8 @@ local DEFAULT_SETTINGS = {
     Box = { Enabled = true, Thickness = 1.5 },
     Name = { Enabled = true, Size = 16, Outline = true },
     Distance = { Enabled = true, Color = Color3.fromRGB(255, 255, 255), Size = 14, Outline = true },
+    NameMultiplier = 1,
+    DistanceMultiplier = 1,
     Health = {
         Box = { Enabled = true, Height = 5, Offset = 5 },
         Text = { Enabled = true, Size = 13, Outline = true, Format = "HP: %d%%" }
@@ -184,13 +186,13 @@ if success and Library then
     nWlTog.Set(SETTINGS.NPC_ESP.WhitelistEnabled)
     NPCESPGroup:Textbox({Name = "Whitelist (comma-separated)", Default = table.concat(SETTINGS.NPC_ESP.Whitelist or {}, ", "), Placeholder = "NPC1, Dummy", Callback = function(txt) SETTINGS.NPC_ESP.Whitelist = parseWhitelistStr(txt) end})
 
-    local VisualsGroup = MainTab:Group("Visuals (Global)")
+    local VisualsGroup = MainTab:Group("Global")
     local hTog = VisualsGroup:Toggle({Name = "Highlight", Callback = function(v) SETTINGS.Highlight.Enabled = v end})
     hTog.Set(SETTINGS.Highlight.Enabled)
     local boxTog = VisualsGroup:Toggle({Name = "Box", Callback = function(v) SETTINGS.Box.Enabled = v end})
     boxTog.Set(SETTINGS.Box.Enabled)
-    VisualsGroup:Slider({Name = "Name Size (default)", Min = 10, Max = 24, Default = SETTINGS.Name.Size, Callback = function(v) SETTINGS.Name.Size = v end})
-    VisualsGroup:Slider({Name = "Distance Size (default)", Min = 10, Max = 20, Default = SETTINGS.Distance.Size, Callback = function(v) SETTINGS.Distance.Size = v end})
+    VisualsGroup:Slider({Name = "Name Size Multiplier", Min = 50, Max = 200, Default = math.floor((SETTINGS.NameMultiplier or 1) * 100), Unit = "%", Callback = function(v) SETTINGS.NameMultiplier = v / 100 end})
+    VisualsGroup:Slider({Name = "Distance Size Multiplier", Min = 50, Max = 200, Default = math.floor((SETTINGS.DistanceMultiplier or 1) * 100), Unit = "%", Callback = function(v) SETTINGS.DistanceMultiplier = v / 100 end})
 
     local CombatTab = Library:Tab("Combat", 10455604811)
     local TriggerGroup = CombatTab:Group("Triggerbot")
@@ -201,8 +203,10 @@ if success and Library then
     local legsTog = TriggerGroup:Toggle({Name = "Shoot Legs", Callback = function(v) SETTINGS.Triggerbot.ShootLegs = v end})
     legsTog.Set(SETTINGS.Triggerbot.ShootLegs)
     TriggerGroup:Slider({Name = "Click Delay", Min = 0, Max = 500, Default = math.floor(SETTINGS.Triggerbot.ClickDelay * 1000), Unit = " ms", Callback = function(v) SETTINGS.Triggerbot.ClickDelay = v / 1000 end})
-    local wlTog = TriggerGroup:Toggle({Name = "Whitelist Enabled", Callback = function(v) SETTINGS.Triggerbot.WhitelistEnabled = v end})
+    local wlTog = TriggerGroup:Toggle({Name = "Whitelist Enabled", Tooltip = "Don't shoot whitelisted players/NPCs", Callback = function(v) SETTINGS.Triggerbot.WhitelistEnabled = v end})
     wlTog.Set(SETTINGS.Triggerbot.WhitelistEnabled)
+    if not SETTINGS.Triggerbot.Whitelist then SETTINGS.Triggerbot.Whitelist = {} end
+    TriggerGroup:Textbox({Name = "Whitelist (comma-separated)", Default = table.concat(SETTINGS.Triggerbot.Whitelist or {}, ", "), Placeholder = "Player1, NPC1", Callback = function(txt) SETTINGS.Triggerbot.Whitelist = parseWhitelistStr(txt) end})
     TriggerGroup:Slider({Name = "Max Distance", Min = 100, Max = 1500, Default = SETTINGS.Triggerbot.MaxDistance, Unit = " studs", Callback = function(v) SETTINGS.Triggerbot.MaxDistance = v end})
     TriggerGroup:Dropdown({Name = "Triggerbot Key", Options = {"Right Mouse", "Left Mouse"}, Default = SETTINGS.Triggerbot.ActiveKey == Enum.UserInputType.MouseButton2 and "Right Mouse" or "Left Mouse", Callback = function(opt)
         SETTINGS.Triggerbot.ActiveKey = (opt == "Right Mouse") and Enum.UserInputType.MouseButton2 or Enum.UserInputType.MouseButton1
@@ -213,6 +217,7 @@ if success and Library then
     local teleTog = SettingsGroup:Toggle({Name = "Auto Execute On Teleport", Tooltip = "Re-run script after teleport", Callback = function(v) SETTINGS.AutoExecuteOnTeleport = v end})
     teleTog.Set(SETTINGS.AutoExecuteOnTeleport)
     SettingsGroup:Button({Name = "Unload", Variant = "Danger", Tooltip = "Stop script and close UI", Callback = function()
+        _G.PerkESP_Unloading = true
         for char, data in pairs(ESP_STORAGE) do
             if data and data.CachedChar then
                 pcall(function()
@@ -220,14 +225,29 @@ if success and Library then
                     if h then h:Destroy() end
                 end)
             end
+            if data and data.Connections then
+                for _, conn in ipairs(data.Connections) do
+                    pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end)
+                end
+            end
         end
-        for _, conn in pairs(_G.PerkESP and _G.PerkESP.Connections or {}) do
-            pcall(function() conn:Disconnect() end)
+        ESP_STORAGE = {}
+        local connections = _G.PerkESP and _G.PerkESP.Connections
+        if connections then
+            for i = #connections, 1, -1 do
+                local conn = connections[i]
+                pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end)
+            end
         end
-        for _, drawing in pairs(_G.PerkESP and _G.PerkESP.Drawings or {}) do
-            pcall(function() if drawing.Remove then drawing:Remove() end end)
+        local drawings = _G.PerkESP and _G.PerkESP.Drawings
+        if drawings then
+            for i = #drawings, 1, -1 do
+                local d = drawings[i]
+                pcall(function() if d and d.Remove then d:Remove() end end)
+            end
         end
         _G.PerkESP = nil
+        _G.PerkESP_Settings = nil
         if Library and Library.Destroy then
             Library:Destroy()
         end
@@ -564,6 +584,7 @@ end
 
 local function AuditESP()
     while true do
+        if _G.PerkESP_Unloading then break end
         task.wait(3)
 
         for char, data in pairs(ESP_STORAGE) do
@@ -607,8 +628,9 @@ local function InitializePerk()
     local renderConn = RunService.RenderStepped:Connect(function()
         if not SETTINGS.Enabled then
             for _, drawings in pairs(ESP_STORAGE) do
-                for _, d in pairs(drawings) do
-                    if typeof(d) == "userdata" and d.Visible then
+                for _, key in ipairs({"Box", "Name", "Dist", "HealthBg", "HealthMain", "HealthText"}) do
+                    local d = drawings[key]
+                    if d and typeof(d) == "userdata" and d.Visible then
                         d.Visible = false
                     end
                 end
@@ -700,9 +722,9 @@ local function InitializePerk()
                                         ManageHighlight(character, true, config.HighlightColor)
 
                                         local nameEnabled = getVisual(config, "Name", "Enabled", true)
-                                        local nameSize = getVisual(config, "Name", "Size", 16)
+                                        local nameSize = math.floor((getVisual(config, "Name", "Size", 16)) * (SETTINGS.NameMultiplier or 1))
                                         local distEnabled = getVisual(config, "Distance", "Enabled", true)
-                                        local distSize = getVisual(config, "Distance", "Size", 14)
+                                        local distSize = math.floor((getVisual(config, "Distance", "Size", 14)) * (SETTINGS.DistanceMultiplier or 1))
                                         local distColor = getVisual(config, "Distance", "Color", SETTINGS.Distance.Color)
                                         local healthBoxEnabled = (config.Health and config.Health.Box and config.Health.Box.Enabled ~= nil) and config.Health.Box.Enabled or SETTINGS.Health.Box.Enabled
                                         local healthTextEnabled = (config.Health and config.Health.Text and config.Health.Text.Enabled ~= nil) and config.Health.Text.Enabled or SETTINGS.Health.Text.Enabled
