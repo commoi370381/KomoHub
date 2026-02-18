@@ -1,3 +1,5 @@
+print("KOMOHUB UI LIBRARY LOADING...")
+
 local Workspace              = cloneref(game:GetService("Workspace"))
 local Camera                 = Workspace.CurrentCamera
 local Lighting               = cloneref(game:GetService("Lighting"))

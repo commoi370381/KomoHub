@@ -1,5 +1,7 @@
 if _G.PerkESP_Unloading then return end
 
+print("KOMOHUB LOADING...")
+
 local Workspace              = cloneref(game:GetService("Workspace"))
 local Camera                 = Workspace.CurrentCamera
 local Lighting               = cloneref(game:GetService("Lighting"))
