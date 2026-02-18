@@ -47,7 +47,7 @@ end
 
 local ScreenGui = Create("ScreenGui", {
     Name = "KomoHubUI",
-    Parent = game:GetService("CoreGui"),
+    Parent = CoreGui,
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
     DisplayOrder = 1000,
     ResetOnSpawn = false,

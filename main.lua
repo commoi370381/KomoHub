@@ -1,3 +1,5 @@
+if _G.PerkESP_Unloading then return end
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UIS = game:GetService("UserInputService")
@@ -5,21 +7,6 @@ local VIM = game:GetService("VirtualInputManager")
 local StarterGui = game:GetService("StarterGui")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-
-if _G.PerkESP then
-    if _G.PerkESP.Connections then
-        for _, connection in pairs(_G.PerkESP.Connections) do
-            if connection then connection:Disconnect() end
-        end
-    end
-    
-    if _G.PerkESP.Drawings then
-        for _, drawing in pairs(_G.PerkESP.Drawings) do
-            if drawing and drawing.Remove then drawing:Remove() end
-        end
-    end
-    _G.PerkESP = nil
-end
 
 _G.PerkESP = {
     Connections = {},
@@ -136,10 +123,10 @@ _G.UNLOAD_KOMOHUB = function()
         end
         _G.PerkESP = nil
         _G.PerkESP_Settings = nil
-        local lib = _G.Library
-        if lib and lib.Destroy then
-            pcall(function() lib:Destroy() end)
+        if _G.Library and _G.Library.Destroy then
+            pcall(function() _G.Library:Destroy() end)
         end
+        task.wait(3)
         _G.PerkESP_Unloading = false
     end)
 end
