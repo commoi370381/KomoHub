@@ -152,7 +152,8 @@ end
 -- Load UI Library (loadstring from GitHub)
 local UI_LIB_URL = "https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/UI%20Library"
 local success, err = pcall(function()
-    _G.Library = loadstring(game:HttpGet(UI_LIB_URL))()
+    local Library = loadstring(game:HttpGet(UI_LIB_URL))()
+    _G.Library = Library
 end)
 if success and _G.Library then
     _G.Library.MenuKey = Enum.KeyCode.Insert
