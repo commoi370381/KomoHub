@@ -105,13 +105,11 @@ if success and Library then
     local MainTab = Library:Tab("Perk ESP", 10455603612)
 
     local GeneralGroup = MainTab:Group("General")
-    local espTog = GeneralGroup:Toggle({Name = "ESP Enabled", Tooltip = "Master toggle for ESP", Callback = function(v) SETTINGS.Enabled = v end})
+    local espTog = GeneralGroup:Toggle({Name = "ESP Enabled", Tooltip = "Master switch - disables ESP and Triggerbot when off", Callback = function(v) SETTINGS.Enabled = v end})
     espTog.Set(SETTINGS.Enabled)
     local teamTog = GeneralGroup:Toggle({Name = "Team Check", Tooltip = "Don't show teammates", Callback = function(v) SETTINGS.TeamCheck = v end})
     teamTog.Set(SETTINGS.TeamCheck)
     GeneralGroup:Slider({Name = "Max Render Distance", Min = 100, Max = 2000, Default = SETTINGS.MaxRenderDistance, Unit = " studs", Callback = function(v) SETTINGS.MaxRenderDistance = v end})
-    local teleTog = GeneralGroup:Toggle({Name = "Auto Execute On Teleport", Tooltip = "Re-run script after teleport", Callback = function(v) SETTINGS.AutoExecuteOnTeleport = v end})
-    teleTog.Set(SETTINGS.AutoExecuteOnTeleport)
 
     local PlayerESPGroup = MainTab:Group("Player ESP")
     local pEspTog = PlayerESPGroup:Toggle({Name = "Player ESP", Callback = function(v) SETTINGS.PlayerESP.Enabled = v end})
@@ -173,6 +171,8 @@ if success and Library then
 
     local SettingsTab = Library:Tab("Settings", 12403097620)
     local SettingsGroup = SettingsTab:Group("Script")
+    local teleTog = SettingsGroup:Toggle({Name = "Auto Execute On Teleport", Tooltip = "Re-run script after teleport", Callback = function(v) SETTINGS.AutoExecuteOnTeleport = v end})
+    teleTog.Set(SETTINGS.AutoExecuteOnTeleport)
     SettingsGroup:Button({Name = "Unload", Variant = "Danger", Tooltip = "Stop script and close UI", Callback = function()
         for _, conn in pairs(_G.PerkESP and _G.PerkESP.Connections or {}) do
             pcall(function() conn:Disconnect() end)
@@ -536,7 +536,7 @@ local function InitializePerk()
     InitNPCFolderEvents()
 
     AddConnection(RunService.RenderStepped:Connect(function()
-        if not SETTINGS.Triggerbot.Enabled and not SETTINGS.Enabled then
+        if not SETTINGS.Enabled then
             return
         end
 
