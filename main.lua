@@ -115,7 +115,22 @@ if success and Library then
     local MainTab = Library:Tab("Perk ESP", 10455603612)
 
     local GeneralGroup = MainTab:Group("General")
-    local espTog = GeneralGroup:Toggle({Name = "ESP Enabled", Tooltip = "Master switch - disables ESP and Triggerbot when off", Callback = function(v) SETTINGS.Enabled = v end})
+    local espTog = GeneralGroup:Toggle({Name = "ESP Enabled", Tooltip = "Master switch - disables ESP and Triggerbot when off", Callback = function(v)
+        SETTINGS.Enabled = v
+        if v then
+            task.defer(function()
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and p.Character and not ESP_STORAGE[p.Character] then CreateESP(p, false) end
+                end
+                for _, name in ipairs(GetTargetFolders()) do
+                    local folder = workspace:FindFirstChild(name)
+                    if folder then
+                        for _, desc in ipairs(folder:GetDescendants()) do CheckItem(desc) end
+                    end
+                end
+            end)
+        end
+    end})
     espTog.Set(SETTINGS.Enabled)
     local teamTog = GeneralGroup:Toggle({Name = "Team Check", Tooltip = "Don't show teammates", Callback = function(v) SETTINGS.TeamCheck = v end})
     teamTog.Set(SETTINGS.TeamCheck)
@@ -217,40 +232,46 @@ if success and Library then
     local teleTog = SettingsGroup:Toggle({Name = "Auto Execute On Teleport", Tooltip = "Re-run script after teleport", Callback = function(v) SETTINGS.AutoExecuteOnTeleport = v end})
     teleTog.Set(SETTINGS.AutoExecuteOnTeleport)
     SettingsGroup:Button({Name = "Unload", Variant = "Danger", Tooltip = "Stop script and close UI", Callback = function()
-        _G.PerkESP_Unloading = true
-        for char, data in pairs(ESP_STORAGE) do
-            if data and data.CachedChar then
-                pcall(function()
-                    local h = data.CachedChar:FindFirstChild("PerkHighlight")
-                    if h then h:Destroy() end
-                end)
+        task.defer(function()
+            _G.PerkESP_Unloading = true
+            local pk = _G.PerkESP
+            if pk and pk.RenderConnection and pk.RenderConnection.Disconnect then
+                pcall(function() pk.RenderConnection:Disconnect() end)
+                pk.RenderConnection = nil
             end
-            if data and data.Connections then
-                for _, conn in ipairs(data.Connections) do
+            if pk and pk.Connections then
+                for i = #pk.Connections, 1, -1 do
+                    local conn = pk.Connections[i]
                     pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end)
                 end
             end
-        end
-        ESP_STORAGE = {}
-        local connections = _G.PerkESP and _G.PerkESP.Connections
-        if connections then
-            for i = #connections, 1, -1 do
-                local conn = connections[i]
-                pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end)
+            for char, data in pairs(ESP_STORAGE) do
+                if data and data.CachedChar then
+                    pcall(function()
+                        local h = data.CachedChar:FindFirstChild("PerkHighlight")
+                        if h then h:Destroy() end
+                    end)
+                end
+                if data and data.Connections then
+                    for _, conn in ipairs(data.Connections) do
+                        pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end)
+                    end
+                end
             end
-        end
-        local drawings = _G.PerkESP and _G.PerkESP.Drawings
-        if drawings then
-            for i = #drawings, 1, -1 do
-                local d = drawings[i]
-                pcall(function() if d and d.Remove then d:Remove() end end)
+            for k in pairs(ESP_STORAGE) do ESP_STORAGE[k] = nil end
+            if pk and pk.Drawings then
+                for i = #pk.Drawings, 1, -1 do
+                    local d = pk.Drawings[i]
+                    pcall(function() if d and d.Remove then d:Remove() end end)
+                end
             end
-        end
-        _G.PerkESP = nil
-        _G.PerkESP_Settings = nil
-        if Library and Library.Destroy then
-            Library:Destroy()
-        end
+            _G.PerkESP = nil
+            _G.PerkESP_Settings = nil
+            local lib = Library
+            if lib and lib.Destroy then
+                pcall(function() lib:Destroy() end)
+            end
+        end)
     end})
 
     Library:Notify("Perk ESP loaded", "success")
@@ -310,29 +331,44 @@ end
 local function isWhitelisted(char, player)
     local tb = SETTINGS.Triggerbot
     if not tb or not tb.WhitelistEnabled then return false end
-    local wl = tb.Whitelist
-    if type(wl) ~= "table" or #wl == 0 then return false end
-    if player and table.find(wl, player.Name) then return true end
-    if char and table.find(wl, char.Name) then return true end
-    return false
+    return isInWhitelist(tb.Whitelist or {}, player, char)
 end
 
 local function isESPWhitelisted(char, player, config)
     if not config or not config.WhitelistEnabled then return false end
-    local wl = config.Whitelist
-    if type(wl) ~= "table" or #wl == 0 then return false end
-    if player and table.find(wl, player.Name) then return true end
-    if char and table.find(wl, char.Name) then return true end
-    return false
+    return isInWhitelist(config.Whitelist or {}, player, char)
 end
 
 local function parseWhitelistStr(str)
     local out = {}
+    if type(str) ~= "string" then return out end
     for s in string.gmatch(str:gsub("%s+", " "):gsub("^%s*(.-)%s*$", "%1"), "[^,]+") do
         local name = s:match("^%s*(.-)%s*$")
-        if #name > 0 and not table.find(out, name) then table.insert(out, name) end
+        if #name > 0 then
+            local lower = name:lower()
+            local found = false
+            for _, existing in ipairs(out) do
+                if existing:lower() == lower then found = true break end
+            end
+            if not found then table.insert(out, name) end
+        end
     end
     return out
+end
+
+local function isInWhitelist(wl, player, char)
+    if type(wl) ~= "table" or #wl == 0 then return false end
+    local function matches(name)
+        if not name or #name == 0 then return false end
+        local lower = name:lower()
+        for _, entry in ipairs(wl) do
+            if type(entry) == "string" and entry:lower() == lower then return true end
+        end
+        return false
+    end
+    if player and (matches(player.Name) or matches(player.DisplayName)) then return true end
+    if char and matches(char.Name) then return true end
+    return false
 end
 
 local function getRoot(model)
@@ -626,16 +662,26 @@ local function InitializePerk()
     InitNPCFolderEvents()
 
     local renderConn = RunService.RenderStepped:Connect(function()
+        if _G.PerkESP_Unloading then return end
         if not SETTINGS.Enabled then
             for _, drawings in pairs(ESP_STORAGE) do
                 for _, key in ipairs({"Box", "Name", "Dist", "HealthBg", "HealthMain", "HealthText"}) do
                     local d = drawings[key]
-                    if d and typeof(d) == "userdata" and d.Visible then
+                    if d and typeof(d) == "userdata" then
                         d.Visible = false
                     end
                 end
                 if drawings.CachedChar then
                     pcall(function() ManageHighlight(drawings.CachedChar, false) end)
+                end
+            end
+            local allDrawings = _G.PerkESP and _G.PerkESP.Drawings
+            if allDrawings then
+                for i = 1, #allDrawings do
+                    local d = allDrawings[i]
+                    if d and typeof(d) == "userdata" and d.Visible then
+                        pcall(function() d.Visible = false end)
+                    end
                 end
             end
             return
@@ -708,7 +754,10 @@ local function InitializePerk()
                         end
 
                         if root and root.Parent and hum and hum.Health > 0 and config.Enabled then
-                            if isESPWhitelisted(character, drawings.Player, config) then
+                            local isTeammate = SETTINGS.TeamCheck and drawings.Player and drawings.Player.Team and LocalPlayer.Team and drawings.Player.Team == LocalPlayer.Team
+                            if isTeammate then
+                                if character then ManageHighlight(character, false) end
+                            elseif isESPWhitelisted(character, drawings.Player, config) then
                                 if character then ManageHighlight(character, false) end
                             else
                                 local rootPos = root.Position
@@ -776,7 +825,7 @@ local function InitializePerk()
                                     end
                                 end
                             end
-                        else
+                        elseif not root or not root.Parent or not hum or hum.Health <= 0 then
                             table.insert(toRemove, char)
                         end
                     end
@@ -809,6 +858,7 @@ local function InitializePerk()
         end
     end)
     AddConnection(renderConn)
+    _G.PerkESP.RenderConnection = renderConn
 
     task.spawn(AuditESP)
 
