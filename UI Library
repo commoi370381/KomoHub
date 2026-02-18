@@ -844,7 +844,7 @@ function Library:Tab(name, icon)
         end
 
         function ItemFuncs:Keybind(cfg)
-            local Key = cfg.Default or Enum.KeyCode.Insert
+            local Key = cfg.Default or Enum.KeyCode.End
             local Waiting = false
 
             local Frame = Create("Frame", {
@@ -930,7 +930,7 @@ function Library:Tab(name, icon)
     return GroupFunctions
 end
 
-Library.MenuKey = Enum.KeyCode.Insert
+Library.MenuKey = Enum.KeyCode.End
 local Visible = true
 
 UserInputService.InputBegan:Connect(function(input, gpe)

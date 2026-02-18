@@ -96,6 +96,52 @@ _G.PerkESP_Settings = SETTINGS
 local ESP_STORAGE = {}
 local CONNECTED_FOLDERS = {}
 
+if _G.UNLOAD_KOMOHUB then
+    _G.UNLOAD_KOMOHUB()
+end
+_G.UNLOAD_KOMOHUB = function()
+    task.defer(function()
+        _G.PerkESP_Unloading = true
+        local pk = _G.PerkESP
+        if pk and pk.RenderConnection and pk.RenderConnection.Disconnect then
+            pcall(function() pk.RenderConnection:Disconnect() end)
+            pk.RenderConnection = nil
+        end
+        if pk and pk.Connections then
+            for i = #pk.Connections, 1, -1 do
+                local conn = pk.Connections[i]
+                pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end)
+            end
+        end
+        for char, data in pairs(ESP_STORAGE) do
+            if data and data.CachedChar then
+                pcall(function()
+                    local h = data.CachedChar:FindFirstChild("PerkHighlight")
+                    if h then h:Destroy() end
+                end)
+            end
+            if data and data.Connections then
+                for _, conn in ipairs(data.Connections) do
+                    pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end)
+                end
+            end
+        end
+        for k in pairs(ESP_STORAGE) do ESP_STORAGE[k] = nil end
+        if pk and pk.Drawings then
+            for i = #pk.Drawings, 1, -1 do
+                local d = pk.Drawings[i]
+                pcall(function() if d and d.Remove then d:Remove() end end)
+            end
+        end
+        _G.PerkESP = nil
+        _G.PerkESP_Settings = nil
+        local lib = Library
+        if lib and lib.Destroy then
+            pcall(function() lib:Destroy() end)
+        end
+    end)
+end
+
 -- Load UI Library (loadstring from GitHub)
 local UI_LIB_URL = "https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/UI%20Library"
 local Library = nil
@@ -235,51 +281,12 @@ if success and Library then
     local teleTog = SettingsGroup:Toggle({Name = "Auto Execute On Teleport", Tooltip = "Re-run script after teleport", Callback = function(v) SETTINGS.AutoExecuteOnTeleport = v end})
     teleTog.Set(SETTINGS.AutoExecuteOnTeleport)
     SettingsGroup:Button({Name = "Unload", Variant = "Danger", Tooltip = "Stop script and close UI", Callback = function()
-        task.defer(function()
-            _G.PerkESP_Unloading = true
-            local pk = _G.PerkESP
-            if pk and pk.RenderConnection and pk.RenderConnection.Disconnect then
-                pcall(function() pk.RenderConnection:Disconnect() end)
-                pk.RenderConnection = nil
-            end
-            if pk and pk.Connections then
-                for i = #pk.Connections, 1, -1 do
-                    local conn = pk.Connections[i]
-                    pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end)
-                end
-            end
-            for char, data in pairs(ESP_STORAGE) do
-                if data and data.CachedChar then
-                    pcall(function()
-                        local h = data.CachedChar:FindFirstChild("PerkHighlight")
-                        if h then h:Destroy() end
-                    end)
-                end
-                if data and data.Connections then
-                    for _, conn in ipairs(data.Connections) do
-                        pcall(function() if conn and conn.Disconnect then conn:Disconnect() end end)
-                    end
-                end
-            end
-            for k in pairs(ESP_STORAGE) do ESP_STORAGE[k] = nil end
-            if pk and pk.Drawings then
-                for i = #pk.Drawings, 1, -1 do
-                    local d = pk.Drawings[i]
-                    pcall(function() if d and d.Remove then d:Remove() end end)
-                end
-            end
-            _G.PerkESP = nil
-            _G.PerkESP_Settings = nil
-            local lib = Library
-            if lib and lib.Destroy then
-                pcall(function() lib:Destroy() end)
-            end
-        end)
+        _G.UNLOAD_KOMOHUB()
     end})
 
-    Library:Notify("Perk ESP loaded", "success")
+    Library:Notify("KomoHub Loaded", "Success")
 else
-    warn("[PerkESP] UI Library failed to load:", err)
+    warn("[KomoHub] UI Library failed to load:", err)
 end
 
 local lastShot = 0
