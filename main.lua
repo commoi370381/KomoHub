@@ -98,6 +98,7 @@ local CONNECTED_FOLDERS = {}
 
 if _G.UNLOAD_KOMOHUB then
     _G.UNLOAD_KOMOHUB()
+    task.wait(3)
 end
 _G.UNLOAD_KOMOHUB = function()
     task.defer(function()
