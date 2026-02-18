@@ -208,7 +208,7 @@ local TopBar = Create("Frame", {
 
 local TitleLabel = Create("TextLabel", {
     Parent = TopBar,
-    Text = "eclipse.wtf | fallen",
+    Text = "KomoHub | 1.0.0",
     TextColor3 = CFG.TextDark,
     TextSize = 13,
     Font = CFG.Font,
@@ -961,5 +961,12 @@ MobileToggle.MouseButton1Click:Connect(function()
     Visible = not Visible
     MainFrame.Visible = Visible
 end)
+
+function Library:Destroy()
+    self.Unloaded = true
+    if ScreenGui and ScreenGui.Parent then
+        ScreenGui:Destroy()
+    end
+end
 
 return Library

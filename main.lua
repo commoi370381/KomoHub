@@ -59,13 +59,19 @@ local DEFAULT_SETTINGS = {
     PlayerESP = {
         Enabled = true,
         BoxColor = Color3.fromRGB(255, 255, 255),
-        HighlightColor = Color3.fromRGB(255, 0, 0)
+        HighlightColor = Color3.fromRGB(255, 0, 0),
+        Name = { Enabled = true, Size = 16 },
+        Distance = { Enabled = true, Color = Color3.fromRGB(255, 255, 255), Size = 14 },
+        Health = { Box = { Enabled = true }, Text = { Enabled = true } }
     },
 
     NPC_ESP = {
         Enabled = true,
         BoxColor = Color3.fromRGB(255, 255, 0),
-        HighlightColor = Color3.fromRGB(255, 165, 0)
+        HighlightColor = Color3.fromRGB(255, 165, 0),
+        Name = { Enabled = true, Size = 16 },
+        Distance = { Enabled = true, Color = Color3.fromRGB(255, 255, 255), Size = 14 },
+        Health = { Box = { Enabled = true }, Text = { Enabled = true } }
     },
 
     Highlight = { Enabled = true, FillTransparency = 0.5, OutlineTransparency = 0 },
@@ -89,6 +95,13 @@ local success, err = pcall(function()
 end)
 if success and Library then
     Library.MenuKey = Enum.KeyCode.Insert
+    if not SETTINGS.PlayerESP.Name then SETTINGS.PlayerESP.Name = { Enabled = true, Size = 16 } end
+    if not SETTINGS.PlayerESP.Distance then SETTINGS.PlayerESP.Distance = { Enabled = true, Color = Color3.fromRGB(255,255,255), Size = 14 } end
+    if not SETTINGS.PlayerESP.Health then SETTINGS.PlayerESP.Health = { Box = { Enabled = true }, Text = { Enabled = true } } end
+    if not SETTINGS.NPC_ESP.Name then SETTINGS.NPC_ESP.Name = { Enabled = true, Size = 16 } end
+    if not SETTINGS.NPC_ESP.Distance then SETTINGS.NPC_ESP.Distance = { Enabled = true, Color = Color3.fromRGB(255,255,255), Size = 14 } end
+    if not SETTINGS.NPC_ESP.Health then SETTINGS.NPC_ESP.Health = { Box = { Enabled = true }, Text = { Enabled = true } } end
+
     local MainTab = Library:Tab("Perk ESP", 10455603612)
 
     local GeneralGroup = MainTab:Group("General")
@@ -100,7 +113,50 @@ if success and Library then
     local teleTog = GeneralGroup:Toggle({Name = "Auto Execute On Teleport", Tooltip = "Re-run script after teleport", Callback = function(v) SETTINGS.AutoExecuteOnTeleport = v end})
     teleTog.Set(SETTINGS.AutoExecuteOnTeleport)
 
-    local TriggerGroup = MainTab:Group("Triggerbot")
+    local PlayerESPGroup = MainTab:Group("Player ESP")
+    local pEspTog = PlayerESPGroup:Toggle({Name = "Player ESP", Callback = function(v) SETTINGS.PlayerESP.Enabled = v end})
+    pEspTog.Set(SETTINGS.PlayerESP.Enabled)
+    PlayerESPGroup:ColorPicker({Name = "Box Color", Default = SETTINGS.PlayerESP.BoxColor, Callback = function(c) SETTINGS.PlayerESP.BoxColor = c end})
+    PlayerESPGroup:ColorPicker({Name = "Highlight", Default = SETTINGS.PlayerESP.HighlightColor, Callback = function(c) SETTINGS.PlayerESP.HighlightColor = c end})
+    local pNameTog = PlayerESPGroup:Toggle({Name = "Name", Callback = function(v) SETTINGS.PlayerESP.Name.Enabled = v end})
+    pNameTog.Set(SETTINGS.PlayerESP.Name.Enabled)
+    PlayerESPGroup:Slider({Name = "Name Size", Min = 10, Max = 24, Default = SETTINGS.PlayerESP.Name.Size, Callback = function(v) SETTINGS.PlayerESP.Name.Size = v end})
+    local pDistTog = PlayerESPGroup:Toggle({Name = "Distance", Callback = function(v) SETTINGS.PlayerESP.Distance.Enabled = v end})
+    pDistTog.Set(SETTINGS.PlayerESP.Distance.Enabled)
+    PlayerESPGroup:Slider({Name = "Distance Size", Min = 10, Max = 20, Default = SETTINGS.PlayerESP.Distance.Size, Callback = function(v) SETTINGS.PlayerESP.Distance.Size = v end})
+    PlayerESPGroup:ColorPicker({Name = "Distance Color", Default = SETTINGS.PlayerESP.Distance.Color, Callback = function(c) SETTINGS.PlayerESP.Distance.Color = c end})
+    local pHpBoxTog = PlayerESPGroup:Toggle({Name = "Health Bar", Callback = function(v) SETTINGS.PlayerESP.Health.Box.Enabled = v end})
+    pHpBoxTog.Set(SETTINGS.PlayerESP.Health.Box.Enabled)
+    local pHpTextTog = PlayerESPGroup:Toggle({Name = "Health Text", Callback = function(v) SETTINGS.PlayerESP.Health.Text.Enabled = v end})
+    pHpTextTog.Set(SETTINGS.PlayerESP.Health.Text.Enabled)
+
+    local NPCESPGroup = MainTab:Group("NPC ESP")
+    local npcEspTog = NPCESPGroup:Toggle({Name = "NPC ESP", Callback = function(v) SETTINGS.NPC_ESP.Enabled = v end})
+    npcEspTog.Set(SETTINGS.NPC_ESP.Enabled)
+    NPCESPGroup:ColorPicker({Name = "Box Color", Default = SETTINGS.NPC_ESP.BoxColor, Callback = function(c) SETTINGS.NPC_ESP.BoxColor = c end})
+    NPCESPGroup:ColorPicker({Name = "Highlight", Default = SETTINGS.NPC_ESP.HighlightColor, Callback = function(c) SETTINGS.NPC_ESP.HighlightColor = c end})
+    local nNameTog = NPCESPGroup:Toggle({Name = "Name", Callback = function(v) SETTINGS.NPC_ESP.Name.Enabled = v end})
+    nNameTog.Set(SETTINGS.NPC_ESP.Name.Enabled)
+    NPCESPGroup:Slider({Name = "Name Size", Min = 10, Max = 24, Default = SETTINGS.NPC_ESP.Name.Size, Callback = function(v) SETTINGS.NPC_ESP.Name.Size = v end})
+    local nDistTog = NPCESPGroup:Toggle({Name = "Distance", Callback = function(v) SETTINGS.NPC_ESP.Distance.Enabled = v end})
+    nDistTog.Set(SETTINGS.NPC_ESP.Distance.Enabled)
+    NPCESPGroup:Slider({Name = "Distance Size", Min = 10, Max = 20, Default = SETTINGS.NPC_ESP.Distance.Size, Callback = function(v) SETTINGS.NPC_ESP.Distance.Size = v end})
+    NPCESPGroup:ColorPicker({Name = "Distance Color", Default = SETTINGS.NPC_ESP.Distance.Color, Callback = function(c) SETTINGS.NPC_ESP.Distance.Color = c end})
+    local nHpBoxTog = NPCESPGroup:Toggle({Name = "Health Bar", Callback = function(v) SETTINGS.NPC_ESP.Health.Box.Enabled = v end})
+    nHpBoxTog.Set(SETTINGS.NPC_ESP.Health.Box.Enabled)
+    local nHpTextTog = NPCESPGroup:Toggle({Name = "Health Text", Callback = function(v) SETTINGS.NPC_ESP.Health.Text.Enabled = v end})
+    nHpTextTog.Set(SETTINGS.NPC_ESP.Health.Text.Enabled)
+
+    local VisualsGroup = MainTab:Group("Visuals (Global)")
+    local hTog = VisualsGroup:Toggle({Name = "Highlight", Callback = function(v) SETTINGS.Highlight.Enabled = v end})
+    hTog.Set(SETTINGS.Highlight.Enabled)
+    local boxTog = VisualsGroup:Toggle({Name = "Box", Callback = function(v) SETTINGS.Box.Enabled = v end})
+    boxTog.Set(SETTINGS.Box.Enabled)
+    VisualsGroup:Slider({Name = "Name Size (default)", Min = 10, Max = 24, Default = SETTINGS.Name.Size, Callback = function(v) SETTINGS.Name.Size = v end})
+    VisualsGroup:Slider({Name = "Distance Size (default)", Min = 10, Max = 20, Default = SETTINGS.Distance.Size, Callback = function(v) SETTINGS.Distance.Size = v end})
+
+    local CombatTab = Library:Tab("Combat", 10455604811)
+    local TriggerGroup = CombatTab:Group("Triggerbot")
     local trigTog = TriggerGroup:Toggle({Name = "Triggerbot Enabled", Callback = function(v) SETTINGS.Triggerbot.Enabled = v end})
     trigTog.Set(SETTINGS.Triggerbot.Enabled)
     local atkTog = TriggerGroup:Toggle({Name = "Attack NPCs", Callback = function(v) SETTINGS.Triggerbot.AttackNPCs = v end})
@@ -115,33 +171,20 @@ if success and Library then
         SETTINGS.Triggerbot.ActiveKey = (opt == "Right Mouse") and Enum.UserInputType.MouseButton2 or Enum.UserInputType.MouseButton1
     end})
 
-    local PlayerESPGroup = MainTab:Group("Player ESP")
-    local pEspTog = PlayerESPGroup:Toggle({Name = "Player ESP", Callback = function(v) SETTINGS.PlayerESP.Enabled = v end})
-    pEspTog.Set(SETTINGS.PlayerESP.Enabled)
-    PlayerESPGroup:ColorPicker({Name = "Player Box Color", Default = SETTINGS.PlayerESP.BoxColor, Callback = function(c) SETTINGS.PlayerESP.BoxColor = c end})
-    PlayerESPGroup:ColorPicker({Name = "Player Highlight", Default = SETTINGS.PlayerESP.HighlightColor, Callback = function(c) SETTINGS.PlayerESP.HighlightColor = c end})
-
-    local NPCESPGroup = MainTab:Group("NPC ESP")
-    local npcEspTog = NPCESPGroup:Toggle({Name = "NPC ESP", Callback = function(v) SETTINGS.NPC_ESP.Enabled = v end})
-    npcEspTog.Set(SETTINGS.NPC_ESP.Enabled)
-    NPCESPGroup:ColorPicker({Name = "NPC Box Color", Default = SETTINGS.NPC_ESP.BoxColor, Callback = function(c) SETTINGS.NPC_ESP.BoxColor = c end})
-    NPCESPGroup:ColorPicker({Name = "NPC Highlight", Default = SETTINGS.NPC_ESP.HighlightColor, Callback = function(c) SETTINGS.NPC_ESP.HighlightColor = c end})
-
-    local VisualsGroup = MainTab:Group("Visuals")
-    local hTog = VisualsGroup:Toggle({Name = "Highlight", Callback = function(v) SETTINGS.Highlight.Enabled = v end})
-    hTog.Set(SETTINGS.Highlight.Enabled)
-    local boxTog = VisualsGroup:Toggle({Name = "Box", Callback = function(v) SETTINGS.Box.Enabled = v end})
-    boxTog.Set(SETTINGS.Box.Enabled)
-    local nameTog = VisualsGroup:Toggle({Name = "Name", Callback = function(v) SETTINGS.Name.Enabled = v end})
-    nameTog.Set(SETTINGS.Name.Enabled)
-    local distTog = VisualsGroup:Toggle({Name = "Distance", Callback = function(v) SETTINGS.Distance.Enabled = v end})
-    distTog.Set(SETTINGS.Distance.Enabled)
-    local hpBoxTog = VisualsGroup:Toggle({Name = "Health Bar", Callback = function(v) SETTINGS.Health.Box.Enabled = v end})
-    hpBoxTog.Set(SETTINGS.Health.Box.Enabled)
-    local hpTextTog = VisualsGroup:Toggle({Name = "Health Text", Callback = function(v) SETTINGS.Health.Text.Enabled = v end})
-    hpTextTog.Set(SETTINGS.Health.Text.Enabled)
-    VisualsGroup:Slider({Name = "Name Size", Min = 10, Max = 24, Default = SETTINGS.Name.Size, Callback = function(v) SETTINGS.Name.Size = v end})
-    VisualsGroup:Slider({Name = "Distance Size", Min = 10, Max = 20, Default = SETTINGS.Distance.Size, Callback = function(v) SETTINGS.Distance.Size = v end})
+    local SettingsTab = Library:Tab("Settings", 12403097620)
+    local SettingsGroup = SettingsTab:Group("Script")
+    SettingsGroup:Button({Name = "Unload", Variant = "Danger", Tooltip = "Stop script and close UI", Callback = function()
+        for _, conn in pairs(_G.PerkESP and _G.PerkESP.Connections or {}) do
+            pcall(function() conn:Disconnect() end)
+        end
+        for _, drawing in pairs(_G.PerkESP and _G.PerkESP.Drawings or {}) do
+            pcall(function() if drawing.Remove then drawing:Remove() end end)
+        end
+        _G.PerkESP = nil
+        if Library and Library.Destroy then
+            Library:Destroy()
+        end
+    end})
 
     Library:Notify("Perk ESP loaded", "success")
 else
@@ -218,6 +261,17 @@ local function getChar(part)
         current = current.Parent
     end
     return nil
+end
+
+local function getVisual(config, key, subkey, default)
+    local c = config and config[key]
+    if subkey then
+        c = c and c[subkey]
+    end
+    if c ~= nil then return c end
+    local g = SETTINGS[key]
+    if subkey then g = g and g[subkey] end
+    return g ~= nil and g or default
 end
 
 local function ManageHighlight(character, shouldShow, color)
@@ -562,7 +616,15 @@ local function InitializePerk()
                                 if onScreen then
                                     isActuallyVisible = true
                                     ManageHighlight(character, true, config.HighlightColor)
-                                    
+
+                                    local nameEnabled = getVisual(config, "Name", "Enabled", true)
+                                    local nameSize = getVisual(config, "Name", "Size", 16)
+                                    local distEnabled = getVisual(config, "Distance", "Enabled", true)
+                                    local distSize = getVisual(config, "Distance", "Size", 14)
+                                    local distColor = getVisual(config, "Distance", "Color", SETTINGS.Distance.Color)
+                                    local healthBoxEnabled = (config.Health and config.Health.Box and config.Health.Box.Enabled ~= nil) and config.Health.Box.Enabled or SETTINGS.Health.Box.Enabled
+                                    local healthTextEnabled = (config.Health and config.Health.Text and config.Health.Text.Enabled ~= nil) and config.Health.Text.Enabled or SETTINGS.Health.Text.Enabled
+
                                     local scale = 1 / (dist * fovFactor) * 1000
                                     local w, h = scale * 6, scale * 8
                                     local x, y = screenPos.X - w/2, screenPos.Y - h/2
@@ -572,7 +634,8 @@ local function InitializePerk()
                                     drawings.Box.Position = Vector2.new(x, y)
                                     drawings.Box.Color = config.BoxColor
 
-                                    drawings.Name.Visible = SETTINGS.Name.Enabled
+                                    drawings.Name.Visible = nameEnabled
+                                    drawings.Name.Size = nameSize
                                     if drawings.IsNPC then
                                         drawings.Name.Text = "[NPC] " .. character.Name
                                     elseif drawings.Player then
@@ -582,27 +645,28 @@ local function InitializePerk()
                                     end
                                     drawings.Name.Position = Vector2.new(screenPos.X, y - 20)
                                     drawings.Name.Color = config.BoxColor
-                                    
+
                                     local healthP = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-                                    
-                                    drawings.HealthBg.Visible = SETTINGS.Health.Box.Enabled
+
+                                    drawings.HealthBg.Visible = healthBoxEnabled
                                     drawings.HealthBg.Size = Vector2.new(w, 5)
                                     drawings.HealthBg.Position = Vector2.new(x, y + h + 5)
-                                    
-                                    drawings.HealthMain.Visible = SETTINGS.Health.Box.Enabled
+
+                                    drawings.HealthMain.Visible = healthBoxEnabled
                                     drawings.HealthMain.Size = Vector2.new(w * healthP, 5)
                                     drawings.HealthMain.Position = Vector2.new(x, y + h + 5)
                                     drawings.HealthMain.Color = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), healthP)
-                                    
-                                    drawings.HealthText.Visible = SETTINGS.Health.Text.Enabled
+
+                                    drawings.HealthText.Visible = healthTextEnabled
                                     drawings.HealthText.Text = string.format("HP: %d%%", math.floor(healthP * 100))
                                     drawings.HealthText.Position = Vector2.new(screenPos.X, y + h + 15)
                                     drawings.HealthText.Color = Color3.fromRGB(0, 255, 0)
 
-                                    drawings.Dist.Visible = SETTINGS.Distance.Enabled
+                                    drawings.Dist.Visible = distEnabled
+                                    drawings.Dist.Size = distSize
                                     drawings.Dist.Text = math.floor(dist) .. " studs"
                                     drawings.Dist.Position = Vector2.new(screenPos.X, y + h + 25)
-                                    drawings.Dist.Color = SETTINGS.Distance.Color
+                                    drawings.Dist.Color = distColor
                                 end
                             end
                         else
