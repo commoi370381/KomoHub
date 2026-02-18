@@ -83,7 +83,7 @@ _G.PerkESP_Settings = SETTINGS
 local ESP_STORAGE = {}
 local CONNECTED_FOLDERS = {}
 
-if _G.UNLOAD_KOMOHUB then
+if _G.UNLOAD_KOMOHUB and not _G.PerkESP_Unloading then
     _G.UNLOAD_KOMOHUB()
     task.wait(3)
 end
