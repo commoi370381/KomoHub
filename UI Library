@@ -1,12 +1,28 @@
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui")
-local HttpService = game:GetService("HttpService")
+local Workspace              = cloneref(game:GetService("Workspace"))
+local Camera                 = Workspace.CurrentCamera
+local Lighting               = cloneref(game:GetService("Lighting"))
+local Players                = cloneref(game:GetService("Players"))
+local LocalPlayer            = Players.LocalPlayer
+local UserInputService       = cloneref(game:GetService("UserInputService"))
+local HttpService            = cloneref(game:GetService("HttpService"))
+local RunService             = cloneref(game:GetService("RunService"))
+local CoreGui                = cloneref(game:GetService("CoreGui"))
+local Stats                  = cloneref(game:GetService("Stats"))
+local ReplicatedStorage      = cloneref(game:GetService("ReplicatedStorage"))
+local ReplicatedFirst        = cloneref(game:GetService("ReplicatedFirst"))
+local TextChatService        = cloneref(game:GetService("TextChatService"))
+local GuiService             = cloneref(game:GetService("GuiService"))
+local TweenService           = cloneref(game:GetService("TweenService"))
+local RbxAnalyticsService    = cloneref(game:GetService("RbxAnalyticsService"))
+for Index, Func in getgenv() do
+    if typeof(Func) == "function" then
+        clonefunction(Func)
+    end
+end
 
-local Player = Players.LocalPlayer
-local Mouse = Player:GetMouse()
+local VirtualInputManager    = Instance.new("VirtualInputManager")
+
+local Mouse = LocalPlayer:GetMouse()
 local ViewportSize = workspace.CurrentCamera.ViewportSize
 
 local CFG = {

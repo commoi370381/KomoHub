@@ -1,12 +1,28 @@
 if _G.PerkESP_Unloading then return end
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-local VIM = game:GetService("VirtualInputManager")
-local StarterGui = game:GetService("StarterGui")
-local Camera = workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
+local Workspace              = cloneref(game:GetService("Workspace"))
+local Camera                 = Workspace.CurrentCamera
+local Lighting               = cloneref(game:GetService("Lighting"))
+local Players                = cloneref(game:GetService("Players"))
+local LocalPlayer            = Players.LocalPlayer
+local UserInputService       = cloneref(game:GetService("UserInputService"))
+local HttpService            = cloneref(game:GetService("HttpService"))
+local RunService             = cloneref(game:GetService("RunService"))
+local CoreGui                = cloneref(game:GetService("CoreGui"))
+local Stats                  = cloneref(game:GetService("Stats"))
+local ReplicatedStorage      = cloneref(game:GetService("ReplicatedStorage"))
+local ReplicatedFirst        = cloneref(game:GetService("ReplicatedFirst"))
+local TextChatService        = cloneref(game:GetService("TextChatService"))
+local GuiService             = cloneref(game:GetService("GuiService"))
+local TweenService           = cloneref(game:GetService("TweenService"))
+local RbxAnalyticsService    = cloneref(game:GetService("RbxAnalyticsService"))
+for Index, Func in getgenv() do
+    if typeof(Func) == "function" then
+        clonefunction(Func)
+    end
+end
+
+local VirtualInputManager    = Instance.new("VirtualInputManager")
 
 _G.PerkESP = {
     Connections = {},
@@ -708,10 +724,10 @@ local function InitializePerk()
                             local canShoot = (targetP and (not SETTINGS.TeamCheck or targetP.Team ~= LocalPlayer.Team)) or (not targetP and SETTINGS.Triggerbot.AttackNPCs)
                             if canShoot and (tick() - lastShot) > SETTINGS.Triggerbot.ClickDelay then
                                 lastShot = tick()
-                                VIM:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, true, game, 0)
+                                VirtualInputManager:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, true, game, 0)
                                 task.spawn(function()
                                     task.wait(0.01)
-                                    VIM:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, false, game, 0)
+                                    VirtualInputManager:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, false, game, 0)
                                 end)
                             end
                         end
@@ -868,8 +884,6 @@ local function InitializePerk()
             AddConnection(teleportConn)
         end
     end
-
-    StarterGui:SetCore("SendNotification", {Title = "LOADED", Text = "Script Active", Duration = 5})
 end
 
 pcall(InitializePerk)
