@@ -135,7 +135,7 @@ _G.UNLOAD_KOMOHUB = function()
         end
         _G.PerkESP = nil
         _G.PerkESP_Settings = nil
-        local lib = Library
+        local lib = _G.Library
         if lib and lib.Destroy then
             pcall(function() lib:Destroy() end)
         end
@@ -144,13 +144,12 @@ _G.UNLOAD_KOMOHUB = function()
 end
 
 -- Load UI Library (loadstring from GitHub)
-local UI_LIB_URL = "https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/UI%20Library"
-local Library = nil
+local UI_LIB_URL = "https://raw.githubusercontent.com/commoi370381/KomoHub/refs/heads/main/UI%20_G.Library"
 local success, err = pcall(function()
-    Library = loadstring(game:HttpGet(UI_LIB_URL))()
+    _G.Library = loadstring(game:HttpGet(UI_LIB_URL))()
 end)
-if success and Library then
-    Library.MenuKey = Enum.KeyCode.Insert
+if success and _G.Library then
+    _G.Library.MenuKey = Enum.KeyCode.Insert
     if not SETTINGS.PlayerESP.Name then SETTINGS.PlayerESP.Name = { Enabled = true, Size = 16 } end
     if not SETTINGS.PlayerESP.Distance then SETTINGS.PlayerESP.Distance = { Enabled = true, Color = Color3.fromRGB(255,255,255), Size = 14 } end
     if not SETTINGS.PlayerESP.Health then SETTINGS.PlayerESP.Health = { Box = { Enabled = true }, Text = { Enabled = true, Size = 13 } } end
@@ -162,7 +161,7 @@ if success and Library then
     if not SETTINGS.NPC_ESP.WhitelistEnabled then SETTINGS.NPC_ESP.WhitelistEnabled = false end
     if not SETTINGS.NPC_ESP.Whitelist then SETTINGS.NPC_ESP.Whitelist = {} end
 
-    local MainTab = Library:Tab("Perk ESP", 10455603612)
+    local MainTab = _G.Library:Tab("Perk ESP", 10455603612)
 
     local GeneralGroup = MainTab:Group("General")
     local espTog = GeneralGroup:Toggle({Name = "ESP Enabled", Tooltip = "Master switch - disables ESP and Triggerbot when off", Callback = function(v)
@@ -259,7 +258,7 @@ if success and Library then
     VisualsGroup:Slider({Name = "Name Size Multiplier", Min = 50, Max = 200, Default = math.floor((SETTINGS.NameMultiplier or 1) * 100), Unit = "%", Callback = function(v) SETTINGS.NameMultiplier = v / 100 end})
     VisualsGroup:Slider({Name = "Distance Size Multiplier", Min = 50, Max = 200, Default = math.floor((SETTINGS.DistanceMultiplier or 1) * 100), Unit = "%", Callback = function(v) SETTINGS.DistanceMultiplier = v / 100 end})
 
-    local CombatTab = Library:Tab("Combat", 10455604811)
+    local CombatTab = _G.Library:Tab("Combat", 10455604811)
     local TriggerGroup = CombatTab:Group("Triggerbot")
     local trigTog = TriggerGroup:Toggle({Name = "Triggerbot Enabled", Callback = function(v) SETTINGS.Triggerbot.Enabled = v end})
     trigTog.Set(SETTINGS.Triggerbot.Enabled)
@@ -277,7 +276,7 @@ if success and Library then
         SETTINGS.Triggerbot.ActiveKey = (opt == "Right Mouse") and Enum.UserInputType.MouseButton2 or Enum.UserInputType.MouseButton1
     end})
 
-    local SettingsTab = Library:Tab("Settings", 12403097620)
+    local SettingsTab = _G.Library:Tab("Settings", 12403097620)
     local SettingsGroup = SettingsTab:Group("Script")
     local teleTog = SettingsGroup:Toggle({Name = "Auto Execute On Teleport", Tooltip = "Re-run script after teleport", Callback = function(v) SETTINGS.AutoExecuteOnTeleport = v end})
     teleTog.Set(SETTINGS.AutoExecuteOnTeleport)
@@ -285,9 +284,9 @@ if success and Library then
         _G.UNLOAD_KOMOHUB()
     end})
 
-    Library:Notify("KomoHub Loaded", "Success")
+    _G.Library:Notify("KomoHub Loaded", "Success")
 else
-    warn("[KomoHub] UI Library failed to load:", err)
+    warn("[KomoHub] UI _G.Library failed to load:", err)
 end
 
 local lastShot = 0
