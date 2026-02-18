@@ -139,6 +139,7 @@ _G.UNLOAD_KOMOHUB = function()
         if lib and lib.Destroy then
             pcall(function() lib:Destroy() end)
         end
+        _G.PerkESP_Unloading = false
     end)
 end
 
